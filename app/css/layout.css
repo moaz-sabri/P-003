@@ -1,0 +1,242 @@
+/* Page frame: the top band, the main column, the bottom navigation.
+ *
+ * ONE BAND AT THE TOP, AND IT IS STICKY. The header and the row of destinations
+ * are siblings inside `.topbar`, and that wrapper is what makes the wide-screen
+ * layout possible at all.
+ *
+ * They used to be two separate `position: fixed` elements, and on a wide screen
+ * the bar was set to `position: static` so it would join the header. A static
+ * element is laid out where it sits in the document, and the bar sat after
+ * `<main>`, so "joining the header" put a row of links at the very END of the
+ * page: on a long page — the settings page, a hundred questions — you had to
+ * scroll to the bottom to go anywhere. Two fixed elements could not be one band
+ * because neither contained the other.
+ *
+ * `position: sticky` rather than `fixed`, and the difference is the other half of
+ * the same fix: a sticky band keeps its space in the flow, so the content column
+ * needs no top padding at all. With two fixed bars the column's padding had to be
+ * a number that matched their heights, written in one file and the heights in
+ * another — and when the header grew on a wide screen, because it had taken the
+ * navigation on, the padding did not. Every page then began with its first line
+ * behind the bar. There is no number to keep in step now.
+ *
+ * The shape is otherwise the same on a phone and on a desktop: a band at the top,
+ * one centred column of content, and — on a phone only — a fixed bar of
+ * destinations at the bottom. A phone's bottom bar is a thumb target and a
+ * desktop's is not, so the same six links are laid out for the hand that will use
+ * them.
+ */
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: var(--header-h);
+    padding: 0 var(--space-4);
+    /* Translucent, with a backdrop filter where the engine supports it, so content
+     * scrolling under the band is blurred rather than cut off. The solid colour
+     * underneath it is the fallback for engines that do not. */
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+}
+
+.site-header {
+    display: flex;
+    align-items: center;
+    height: var(--header-h);
+    /* No background and no border of its own: the band it sits in has them, and a
+     * second edge under the same band is a line through the middle of the header. */
+    flex: 0 0 auto;
+}
+
+.brand {
+    color: var(--text);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.brand:hover {
+    text-decoration: none;
+}
+
+/* The six destinations, as they appear on a phone. */
+.bottom-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    display: flex;
+    height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+}
+
+.bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--text-muted);
+    /* 10px labels under a 20px icon: below this an iOS user in the Settings
+     * accessibility panel has the label turned off anyway. */
+    font-size: 0.6875rem;
+    text-align: center;
+}
+
+.bottom-nav a:hover {
+    text-decoration: none;
+}
+
+.bottom-nav a[aria-current="page"] {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.bottom-nav .nav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* The content column.
+ *
+ * NO TOP PADDING, because the band above it is sticky and holds its own space.
+ * The bottom padding is the phone's navigation bar and nothing else, and it is
+ * derived from the same variable that bar is sized by, so the last card of a page
+ * is never under it and a short page gets no phantom gap. */
+#app {
+    display: block;
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-4) calc(var(--bottom-nav-h) + var(--space-6));
+}
+
+/* Below this the column is the whole screen, so the side padding shrinks to give
+ * the content back some width. 22rem is 352px: about the width of the smallest
+ * phone still in use, and the point at which a card with 16px of padding on each
+ * side starts to crowd a question rather than frame it. */
+@media (max-width: 22rem) {
+    #app {
+        padding-left: var(--space-3);
+        padding-right: var(--space-3);
+    }
+
+    .card {
+        padding: var(--space-3);
+    }
+}
+
+/* A short screen — a landscape handset, or a small old one — cannot afford 52px
+ * of band plus 58px of bottom bar out of 480px. Both shrink, and the column
+ * follows the bar automatically because its padding is derived from the same
+ * variable. */
+@media (max-height: 30rem) and (max-width: 48rem) {
+    :root {
+        --header-h: 46px;
+        --bottom-nav-h: 50px;
+    }
+}
+
+/* The heading group at the top of a page, with the page's own actions in its
+ * corner. Wrapping is the whole rule: on a 320px phone a title and two buttons
+ * cannot share a row, and a title that is squeezed to two words by a pair of
+ * buttons beside it is worse than the buttons moving to the next line. */
+.page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-5);
+}
+
+/* A section that owns the width itself: the question list and the goal summary
+ * read as one column of cards, and a wider one would just make the tap targets
+ * harder to hit. */
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.stack-tight {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.row-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.grow {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Wide screen: the destinations join the band, as a row of pills beside the name
+ * rather than a row of icons at the bottom of the page.
+ *
+ * `position: static` is now correct, because the band they sit in is sticky and
+ * they are inside it. The row wraps and hugs the end of the band, so a language
+ * with longer labels — or a narrower window — pushes a pill onto a second line
+ * and grows the band rather than overflowing it. */
+@media (min-width: 48rem) {
+    .bottom-nav {
+        position: static;
+        height: auto;
+        padding: 0;
+        border: 0;
+        background: none;
+        flex: 1 1 auto;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-1);
+        flex-wrap: wrap;
+    }
+
+    .bottom-nav a {
+        flex: 0 0 auto;
+        flex-direction: row;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-pill);
+        font-size: 0.875rem;
+    }
+
+    .bottom-nav a[aria-current="page"] {
+        background: var(--accent-soft);
+    }
+
+    .topbar {
+        min-height: 0;
+        padding: 0 var(--space-5);
+    }
+
+    .site-header {
+        height: auto;
+        min-height: var(--header-h);
+        padding: 0;
+    }
+
+    /* Nothing is fixed at the bottom any more, so nothing is reserved for it. */
+    #app {
+        padding-bottom: var(--space-6);
+    }
+}

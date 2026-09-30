@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "checkJs": true,
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "Bundler",
+        "allowJs": true,
+        "strict": true
+    },
+    "exclude": ["node_modules", "tests", "tools"]
+}

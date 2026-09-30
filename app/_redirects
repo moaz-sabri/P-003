@@ -1,0 +1,8 @@
+# SPA fallback for a static host that reads this file (Netlify and friends).
+#
+# Every path that is not a file in this directory is an in-app route: the app is
+# one document and the router picks the view from the URL. `/api/*` is excluded
+# on purpose — this deployment has no PHP in it, so an API path must 404 rather
+# than quietly return the HTML shell to something expecting JSON.
+/api/*   /api/:splat  404
+/*        /dist/index.html  200

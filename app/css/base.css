@@ -1,0 +1,119 @@
+/* Element defaults and the handful of global rules.
+ *
+ * Mobile-first and small: the layout works at 320px and grows from there. There
+ * is no media query in this file except the reduced-motion block, because the
+ * one thing that genuinely differs between a phone and a desktop is how much
+ * room there is — and that belongs in layout.css.
+ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    /* 16px on the root and never below it: iOS Safari zooms the viewport on
+     * focus if the computed font-size of a focused field is under 16px, which is
+     * the single most annoying thing that can happen to a form on a phone. */
+    font-size: 16px;
+    line-height: 1.5;
+    /* The app is one scrolling document with a fixed header and a fixed bottom
+     * nav, so the scrollbar has to live inside the padding or the last card sits
+     * under the nav on desktop. */
+    overflow-wrap: break-word;
+}
+
+/* Both visible in the DOM, so a keyboard user can reach the content, and neither
+ * announced as a stop: the app chrome around it is what needs announcing. */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+h1,
+h2,
+h3 {
+    margin: 0;
+    line-height: 1.25;
+    font-weight: 600;
+}
+
+h1 {
+    font-size: 1.5rem;
+}
+
+h2 {
+    font-size: 1.125rem;
+}
+
+h3 {
+    font-size: 1rem;
+}
+
+p {
+    margin: 0 0 var(--space-3);
+}
+
+p:last-child {
+    margin-bottom: 0;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+ul,
+ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+img,
+svg {
+    max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+    /* Inherited explicitly: a control defaults to the platform's UI font, which
+     * is a different typeface at a different size from the rest of the page and
+     * is the most common reason a hand-built form looks like it came from two
+     * products. */
+    font: inherit;
+    color: inherit;
+}
+
+/* The one animation the app has. `prefers-reduced-motion` collapses every
+ * animation and transition in one place, so honouring it costs each component
+ * nothing — which is why none of them checks the media query itself. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}

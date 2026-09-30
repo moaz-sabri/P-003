@@ -1,0 +1,673 @@
+/* Components: the shapes that appear more than once.
+ *
+ * Grouped by the thing they are rather than by the page that uses them, so a
+ * second use of a card is a matter of adding a class and not of copying
+ * forty lines.
+ */
+
+/* --------------------------------- text ---------------------------------- */
+
+.muted {
+    color: var(--text-muted);
+}
+
+.small {
+    font-size: 0.8125rem;
+}
+
+.tiny {
+    font-size: 0.75rem;
+}
+
+.mono {
+    font-family: var(--font-mono);
+    /* Long keys and ids are read character by character; a proportional font
+     * turns I/1/l into three identical shapes. */
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+}
+
+.nums {
+    /* Tabular figures: a number that changes in place (a countdown, a running
+     * accuracy) must not move everything to its right when it changes width. */
+    font-variant-numeric: tabular-nums;
+}
+
+.page-title {
+    margin-bottom: var(--space-1);
+}
+
+.page-sub {
+    /* No bottom margin: `.page-head` owns the space below the heading group, so
+     * a page with actions and a page without them line up the same way. */
+    margin-bottom: 0;
+    color: var(--text-muted);
+}
+
+/* -------------------------------- buttons -------------------------------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;          /* the smallest comfortable touch target */
+    padding: 0 var(--space-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn:hover {
+    text-decoration: none;
+    filter: brightness(1.06);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: default;
+    filter: none;
+}
+
+.btn-secondary {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+/* A quiet button: no fill, no border, the accent colour. Used for the actions
+ * that sit beside something rather than under it — Back, View, Delete, Remove — and
+ * a dozen of them are on a phone.
+ *
+ * WHICH IS WHY IT IS 44px TALL LIKE EVERY OTHER BUTTON. It used to be 36px, which
+ * is under the minimum `.btn` declares two rules above and under what a thumb can
+ * hit: the "Remove" button under an answer option, the "Delete" on a question, the
+ * "Back" that every sub-page has. It looks smaller because it has nothing painted
+ * on it, and that is the whole point of a quiet button — its box can be as big as
+ * a finger needs without the page showing a single extra border. */
+.btn-quiet {
+    background: none;
+    border-color: transparent;
+    color: var(--accent);
+    font-weight: 500;
+    padding: 0 var(--space-3);
+}
+
+.btn-danger {
+    background: var(--bad-soft);
+    color: var(--bad);
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.btn-row {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.btn-row > .btn {
+    flex: 1 1 8rem;
+}
+
+/* --------------------------------- cards --------------------------------- */
+
+.card {
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
+}
+
+.card-quiet {
+    box-shadow: none;
+    background: var(--surface-sunken);
+}
+
+/* A tappable card. The whole row is the target, so the hit area is the row and
+ * not the 20px of text inside it. */
+.card-link {
+    display: block;
+    color: inherit;
+}
+
+.card-link:hover {
+    text-decoration: none;
+    border-color: var(--accent);
+}
+
+/* A statistic row. Two per line on a narrow phone, and one line per statistic
+ * from 26rem up — the count comes from the ROW, not from the width, because the
+ * app uses rows of two, three and four and `auto-fit` cannot serve all three: a
+ * floor wide enough for four is also wide enough for three, which leaves a
+ * three-item row in a four-column grid with a hole in it, and a floor wide enough
+ * for three leaves a four-item row as three-and-a-lonely-one.
+ *
+ * `statRow()` writes `--cols`; the narrow rule below overrides the count to two
+ * and makes an odd last tile span the row. A full-width tile is a shape; a
+ * half-width one is an accident.
+ */
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+@media (max-width: 26rem) {
+    .stat-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stat-row > :last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
+}
+
+.stat {
+    padding: var(--space-3) var(--space-2);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+    text-align: center;
+    /* A label like "نسبة الصواب" is one long word in a 100px tile. Without this it
+     * pushes the tile wider than its column and the whole row scrolls sideways. */
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* --------------------------------- forms --------------------------------- */
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.field > label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.field-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.field-error {
+    font-size: 0.75rem;
+    color: var(--bad);
+}
+
+.input,
+.select,
+.textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+    border-color: var(--accent);
+}
+
+.textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.field-row {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.field-row > .field {
+    flex: 1 1 8rem;
+}
+
+/* A checkbox or radio as a tap row, not as a 13px box. The input stays in the
+ * accessibility tree and keeps its own state; only its appearance is replaced. */
+.choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.choice input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+
+.choice-mark {
+    margin-left: auto;
+    color: var(--ok);
+    font-weight: 700;
+}
+
+/* -------------------------------- activity -------------------------------- */
+
+/* Daily activity: one bar per day, oldest on the left.
+ *
+ * EVERY DAY IS DRAWN, including the ones with no answers. A gap in the bars is
+ * information — it is the fortnight the app was not opened — and a series that
+ * skipped them would draw a level line across a stretch in which nothing
+ * happened, which is the one thing a report must not do.
+ *
+ * Two tones rather than one: the bar's height is how many answers there were and
+ * its split is how many were right, because "you answered every day and were
+ * getting them wrong" and "you answered every day and were getting them right"
+ * are the same picture at one colour and different pictures at two.
+ *
+ * The bar is marked `aria-hidden` and the numbers are given as text underneath.
+ * A screen reader announcing fourteen unlabelled bars is fourteen facts nobody
+ * asked for, and the same numbers in one sentence is the whole of what the
+ * picture says.
+ */
+.activity {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 4.5rem;
+}
+
+.activity > li {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+}
+
+.activity-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    width: 100%;
+    height: var(--h, 0%);
+    min-height: 2px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--track);
+}
+
+/* A day with no answers is the track and nothing else. The `min-height` above
+ * exists so that a day with ONE answer is still visible, and the fill is the
+ * wrong-answer colour below the correct share — so an empty day came out as a 2px
+ * red sliver, and a fortnight of them read as a fortnight of mistakes to somebody
+ * who opened the app once. */
+.activity-bar[data-empty="true"] {
+    min-height: 0;
+    background: color-mix(in srgb, var(--track) 45%, transparent);
+}
+
+.activity-bar > span {
+    display: block;
+    width: 100%;
+}
+
+.activity-bar > .ok {
+    height: var(--c, 0%);
+    background: var(--ok);
+}
+
+.activity-bar > .bad {
+    height: calc(100% - var(--c, 0%));
+    background: var(--bad);
+}
+
+/* --------------------------------- feedback -------------------------------- */
+
+.empty {
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty h2 {
+    margin-bottom: var(--space-2);
+    color: var(--text);
+}
+
+/* A percentage bar. The value is in `style: --fill`, written through CSSOM
+ * because the CSP has no `unsafe-inline` for styles (see ui/dom.js). */
+.meter {
+    height: 8px;
+    background: var(--track);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+}
+
+.meter > span {
+    display: block;
+    height: 100%;
+    width: var(--fill, 0%);
+    background: var(--accent);
+    border-radius: inherit;
+    transition: width 200ms ease;
+}
+
+.banner {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.banner-warn {
+    background: var(--bad-soft);
+}
+
+/* The toast. Above the nav bar on a phone, and above the bottom of the window on
+ * a desktop, where there is no bar to be above. */
+.toast {
+    position: fixed;
+    inset: auto 0 calc(var(--bottom-nav-h) + var(--space-3));
+    z-index: 60;
+    width: fit-content;
+    max-width: min(28rem, calc(100vw - var(--space-6)));
+    margin: 0 auto;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-2);
+    font-size: 0.875rem;
+}
+
+@media (min-width: 48rem) {
+    /* The nav is in the header now, so the offset above is measuring a bar that is
+     * not there and floats the message 58px off the floor of a screen where
+     * nothing is. The media query used to repeat the phone's value, which is the
+     * same bug in a second place. */
+    .toast {
+        inset: auto 0 var(--space-5);
+    }
+}
+
+/* The modal. A native <dialog> would do this, but `showModal()` needs no
+ * polyfill on any engine this app supports and gives focus trapping, Escape and
+ * the backdrop for free — so the only thing left to write is the look. */
+dialog {
+    width: min(28rem, calc(100vw - var(--space-6)));
+    /* BOUNDED BY THE VIEWPORT, and scrollable. A dialog whose content is taller
+     * than the screen is unreachable below the fold with no way to scroll to it:
+     * `showModal()` centres the box, the bottom of it goes off the bottom of the
+     * page, and the one button that was down there is the button the reader needs
+     * to answer with. `max-height` plus `overflow` is the whole fix; `dvh` rather
+     * than `vh` so a mobile browser's collapsing address bar does not cut the
+     * dialog off. */
+    max-height: calc(100dvh - var(--space-6));
+    overflow: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-2);
+}
+
+dialog::backdrop {
+    background: rgb(8 11 14 / 55%);
+}
+
+/* A dialog's buttons stay reachable rather than scrolling away with the text: the
+ * actions are the answer to the question, and on a short screen they should be
+ * the last thing still on the screen. */
+.dialog-actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    margin-top: var(--space-5);
+    position: sticky;
+    bottom: calc(-1 * var(--space-5));
+    padding-bottom: var(--space-5);
+    margin-bottom: calc(-1 * var(--space-5));
+    background: var(--surface);
+}
+
+/* ------------------------------- questions ------------------------------- */
+
+/* The key. The question text is what the reader is thinking about, so it is the
+ * largest text on the screen and the options are visibly secondary. */
+.question-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+}
+
+.options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 52px;
+    padding: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: start;
+    cursor: pointer;
+}
+
+.option:hover {
+    border-color: var(--accent);
+}
+
+.option[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.option-mark {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* A multiple-choice answer is a box, not a circle — the shape is the only cue
+ * that survives on a small screen. */
+.option[data-kind="multiple"] .option-mark {
+    border-radius: 6px;
+}
+
+.option[aria-pressed="true"] .option-mark {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.option[data-state="correct"] {
+    border-color: var(--ok);
+    background: var(--ok-soft);
+}
+
+.option[data-state="wrong"] {
+    border-color: var(--bad);
+    background: var(--bad-soft);
+}
+
+/* One answer's controls: the text box, whether it is correct, and the button
+ * that removes it. `flex: 1` on the box and `flex: 0 0 auto` on the two buttons is
+ * what makes the row wrap in the right order — the box takes the first line on
+ * its own at 320px, and the two buttons share the second, rather than one button
+ * being pushed off the edge. */
+.option-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.option-row > .input {
+    flex: 1 1 9rem;
+    min-width: 0;
+}
+
+.option-remove {
+    flex: 0 0 auto;
+}
+
+/* The delete control on a list row. A fixed square, so a row of twelve of them
+ * lines up and a row of one does not drift to a size of its own. */
+.row-delete {
+    flex: 0 0 auto;
+    width: var(--space-6);
+    padding: 0;
+    color: var(--text-muted);
+}
+
+.row-delete:hover {
+    color: var(--bad);
+}
+
+/* The running state of an exercise: how many questions are left, and how many
+ * times the exercise has gone round. Two numbers and a bar, and nothing that
+ * would make the reader think they are behind. */
+.run-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.run-progress {
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+.timer {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+/* The feedback strip after an answer. Present only while the reader is looking
+ * at it — the next question replaces it. */
+.verdict {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius);
+    font-weight: 600;
+}
+
+.verdict[data-state="correct"] {
+    background: var(--ok-soft);
+    color: var(--ok);
+}
+
+.verdict[data-state="wrong"] {
+    background: var(--bad-soft);
+    color: var(--bad);
+}
+
+/* The one animation in the app, and it is a state change rather than a
+ * decoration: a row that was just answered keeps its tint for a moment so the
+ * eye can find it while the list re-renders around it. */
+[data-flash="correct"] {
+    animation: flash-ok 420ms ease-out;
+}
+
+[data-flash="wrong"] {
+    animation: flash-bad 420ms ease-out;
+}
+
+/* What the reader got wrong, on the result page.
+ *
+ * The two lines under the question are a pair and are styled as one: what was
+ * chosen in the wrong colour and what was right in the right colour, directly
+ * under each other, so the eye compares them instead of reading two sentences
+ * that happen to be near each other. A divider between entries rather than a gap
+ * alone, because a list of ten questions with the same two lines under each is
+ * exactly the shape of picture where a reader loses their place. */
+.wrong-item {
+    padding-block: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.wrong-item:first-child {
+    padding-top: 0;
+}
+
+.wrong-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.wrong-item > p {
+    margin-bottom: var(--space-1);
+}
+
+.wrong {
+    color: var(--bad);
+}
+
+.right {
+    color: var(--ok);
+}
+
+@keyframes flash-ok {
+    from {
+        box-shadow: 0 0 0 3px var(--ok);
+    }
+
+    to {
+        box-shadow: 0 0 0 3px transparent;
+    }
+}
+
+@keyframes flash-bad {
+    from {
+        box-shadow: 0 0 0 3px var(--bad);
+    }
+
+    to {
+        box-shadow: 0 0 0 3px transparent;
+    }
+}

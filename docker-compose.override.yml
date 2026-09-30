@@ -1,0 +1,11 @@
+services:
+  web:
+    volumes:
+      - ./app:/usr/share/nginx/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+  php:
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      ENVIRONMENT: development
+    volumes: !override
+      - ./api:/app/api

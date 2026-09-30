@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Recall">
+    <rect x="0" y="0" width="512" height="512" rx="112" fill="#141a20"/>
+    <path d="M150 268 L228 344 L366 190"
+          fill="none"
+          stroke="#7cc0ff"
+          stroke-width="46"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+</svg>

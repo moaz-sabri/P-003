@@ -1,0 +1,35 @@
+# Nothing in this directory is a document. api/index.php is a front controller
+# that is REACHED, never served, and every other file here is a PHP source, a
+# config or the database itself.
+#
+# For a plain Apache host, where the sync backend lives under the document root:
+# everything is denied, and index.php is put back as the single allowed handler by
+# the RewriteRule below. nginx does the same thing with `location ^~ /api/` and
+# docker-router.php with its own branch, so the three deployments agree on which
+# file a request may execute.
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(?:php|sqlite|sqlite3|db|db-wal|db-shm|log|md|json|example)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+# The routes, for a host that has not been given a rewrite rule pointing at this
+# directory. Everything that is not a real file goes to the front controller, which
+# matches exact paths and refuses the rest.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # A request for a file that exists under api/ must not reach index.php with the
+    # path attached — B is the query string, C is the path, and passing C on would
+    # let `GET /api/db.php` be routed and answered by a controller that has no idea
+    # what was asked. The FilesMatch above already denies those outright; this is
+    # the second refusal, at the routing layer.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+DirectoryIndex index.php
+Options -Indexes -ExecCGI

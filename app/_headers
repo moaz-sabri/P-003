@@ -1,0 +1,39 @@
+# Security headers for a static host that reads this file (Netlify, Cloudflare
+# Pages and anything else that honours _headers).
+#
+# This is the FOURTH place these headers are declared, after
+# docker/nginx/default.conf, api/index.php and docker-router.php. They are
+# repeated rather than shared because the four deployments are four separate
+# files that cannot import one another — but every one of them sends the SAME
+# policy, and the tests assert the two that are in this repository (nginx and the
+# PHP router) still agree with this one.
+#
+# `X-Frame-Options` is here as well as `frame-ancestors 'none'` because old
+# browsers honour only the former.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+# A content-hashed asset changes name whenever its bytes change, so it can be
+# kept for a year and never revalidated.
+/dist/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The shell names the hashed assets, so a stored copy of it is an app loading an
+# old bundle — and a stored service worker is one the browser stops re-reading,
+# so a new release's worker would never install.
+/dist/index.html
+  Cache-Control: no-store, must-revalidate
+
+/sw.js
+  Cache-Control: no-store, must-revalidate
+
+/manifest.webmanifest
+  Cache-Control: no-cache, must-revalidate
+
+/icons/*
+  Cache-Control: public, max-age=2592000, must-revalidate

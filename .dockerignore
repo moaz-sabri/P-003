@@ -1,0 +1,10 @@
+node_modules
+app/dist
+api/var
+api/config.local.php
+.git
+.gitignore
+npm-debug.log*
+Dockerfile
+docker-compose*.yml
+deploy

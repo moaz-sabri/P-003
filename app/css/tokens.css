@@ -1,0 +1,93 @@
+/* Design tokens.
+ *
+ * Every colour, space and radius in the app is named here, so the palette is one
+ * readable block instead of a hundred literals scattered through four stylesheets
+ * — and so dark mode is a second set of values rather than a second codebase.
+ *
+ * The palette is deliberately quiet. This is a tool somebody opens to answer
+ * twenty questions about their own material; a saturated UI competes with the
+ * question being asked and wins, because it is easier to notice.
+ */
+
+:root {
+    color-scheme: light dark;
+
+    /* Neutrals. One hue, several steps, so nothing in the app is a pure grey
+       next to a coloured thing and reads as a different material. */
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-sunken: #eceef1;
+    --border: #d9dde3;
+    --text: #16191d;
+    --text-muted: #5c6673;
+
+    /* One accent, used only for "do this" — the primary action, the current
+       selection, the link. Anything more would stop meaning anything. */
+    --accent: #1667c8;
+    --accent-text: #ffffff;
+    --accent-soft: #e4eefb;
+
+    /* Answers. Four states and no more: right, wrong, and the two tints of the
+     * rows they colour. Green/red is the convention everywhere and carrying the
+     * meaning in the icon as well as the colour is what keeps it readable for a
+     * reader who cannot see either. */
+    --ok: #16794a;
+    --ok-soft: #e2f2e9;
+    --bad: #b3261e;
+    --bad-soft: #fbe6e4;
+
+    /* Progress. One fill, and the track it is drawn on. */
+    --track: #dde1e7;
+
+    --radius: 10px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+
+    /* A 4px scale. Two values are used in almost every component, so they get
+     * names; the rest are rare enough to read off the scale. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    /* Two shadows, not five. Elevation only ever means "this floats above that",
+     * and a page of cards with five levels of shadow is a page where nothing
+     * floats. */
+    --shadow-1: 0 1px 2px rgb(16 20 24 / 8%);
+    --shadow-2: 0 8px 24px rgb(16 20 24 / 14%);
+
+    --header-h: 52px;
+    --bottom-nav-h: 58px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #101418;
+        --surface: #181d23;
+        --surface-sunken: #10151a;
+        --border: #2b323a;
+        --text: #e8ecf1;
+        --text-muted: #9aa4b1;
+
+        /* Lighter than the light-theme accent, not darker: a mid-blue on a dark
+         * background fails contrast far more than it passes. */
+        --accent: #7cc0ff;
+        --accent-text: #08121d;
+        --accent-soft: #1b2c3e;
+
+        --ok: #5dd39e;
+        --ok-soft: #16302a;
+        --bad: #ff9a91;
+        --bad-soft: #38211f;
+
+        --track: #2b323a;
+
+        --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+        --shadow-2: 0 8px 24px rgb(0 0 0 / 50%);
+    }
+}

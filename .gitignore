@@ -1,0 +1,10 @@
+node_modules/
+dist/
+app/dist/
+.DS_Store
+npm-debug.log*
+deploy/*
+
+# Server config secrets and runtime data
+api/config.local.php
+api/var/

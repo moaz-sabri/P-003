@@ -1,0 +1,41 @@
+services:
+  web:
+    build: { context: ., target: web }
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on: [php]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8080/api/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  php:
+    build: { context: ., target: php }
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_PATH: /app/api/var/sync.sqlite
+    volumes:
+      - sync-data:/app/api/var
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  sync-data:

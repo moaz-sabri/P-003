@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Recall">
+    <!-- Maskable: the glyph is kept inside the middle 80% safe zone, because a
+         maskable icon is cropped to whatever shape the platform chooses and the
+         corners of a full-bleed tick get eaten. The background is edge to edge
+         with no rounded corners — the platform supplies the shape. -->
+    <rect x="0" y="0" width="512" height="512" fill="#141a20"/>
+    <path d="M186 262 L242 318 L336 208"
+          fill="none"
+          stroke="#7cc0ff"
+          stroke-width="40"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+</svg>

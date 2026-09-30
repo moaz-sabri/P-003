@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- THE TEMPLATE, NOT THE PAGE. This file is the source of the app shell and it
+     deliberately names no stylesheet and no script: `npm run build` (webpack)
+     emits app/dist/index.html with the content-hashed names of the assets that
+     same build produced, and that generated file — not this one — is what the
+     server hands out for `/`, `/index.html` and every SPA fallback.
+
+     So the served HTML can only ever reference an asset that exists, a rebuild
+     is the only way to change what the page loads, and there is no second file
+     to forget. Do not add <link> or <script src> tags here. -->
+<html lang="en"
+      dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color"
+          content="#101418">
+    <!-- Standalone mode. `mobile-web-app-capable` is what Chrome and Android read
+         and `apple-mobile-web-app-capable` is the iOS spelling; each engine reads
+         exactly one of the two and ignores the other, so both are here and the
+         manifest covers everyone else.
+         `apple-mobile-web-app-title` is what a home-screen icon is NAMED on iOS:
+         without it the installed icon is called "Safari", which is the one place
+         the app stops being called its own name. -->
+    <meta name="mobile-web-app-capable"
+          content="yes">
+    <meta name="apple-mobile-web-app-title"
+          content="Recall">
+    <meta name="apple-mobile-web-app-capable"
+          content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style"
+          content="black">
+    <!-- This app has no accounts and no third-party anything, so the policy is
+         the tightest one that still runs: everything same-origin, nothing
+         framed, no plugins, no form posts. There is no 'unsafe-inline' in
+         script-src or style-src — which is why app/js/ui/dom.js routes the
+         `style` prop through CSSOM instead of the style attribute. -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <link rel="manifest"
+          href="/manifest.webmanifest">
+    <link rel="icon"
+          href="/icons/favicon.svg"
+          type="image/svg+xml">
+    <link rel="apple-touch-icon"
+          href="/icons/apple-touch-icon.png">
+    <!-- /dist/app.<hash>.css is injected here by the build. -->
+    <title>Recall</title>
+</head>
+<body>
+    <!-- The header and the bar of destinations are ONE sticky band, and they are
+         siblings inside a wrapper for that reason.
+         
+         They were separate fixed elements before, which made the wide-screen
+         layout impossible: a `position: static` bar is laid out where it sits in
+         the document, so moving it out of the bottom turned it into a row at the
+         very END of the page — below every card, reachable only by scrolling to
+         the bottom of a long page. A wrapper lets both be `position: static`
+         inside one `position: sticky` parent, which puts the row in the band at
+         the top AND lets the band occupy its own space in the flow — so the
+         content column needs no top padding that has to be kept in step with a
+         bar's height, which is the bug this replaces. -->
+    <div class="topbar">
+        <header class="site-header"><a class="brand"
+               href="/"
+               data-link>Recall</a>
+        </header>
+        <nav id="bottom-nav"
+             class="bottom-nav"
+             aria-label="Main"></nav>
+    </div>
+    <main id="app"
+          tabindex="-1"></main>
+    <div id="dialog-root"></div>
+    <div id="toast-root"
+         aria-live="polite"></div>
+    <!-- /dist/app.<hash>.js is injected here by the build. -->
+</body>
+</html>

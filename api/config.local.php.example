@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * Copy this to `api/config.local.php` and edit it, or set the environment
+ * variables it names instead. It is gitignored and never read when absent.
+ *
+ * `db_path` is the one value that genuinely needs changing: on a plain PHP host
+ * the default (`api/var/sync.sqlite`) is usually fine, but the directory has to
+ * be writable by the web server's user and OUTSIDE the document root if the two
+ * are not the same directory — a `.sqlite` file reachable over HTTP is the whole
+ * database in plain sight.
+ *
+ * Returned as an array, and keys that `config.php` does not define are ignored,
+ * so a typo here is inert rather than fatal.
+ */
+
+declare(strict_types=1);
+
+return [
+    // 'db_path' => '/var/lib/recall/sync.sqlite',
+
+    // Uncomment to send HSTS once HTTPS really terminates here. Do not set this on
+    // a host that also serves plain HTTP: the browser caches the header for the
+    // whole max-age and will then refuse the plain requests.
+    // 'hsts_max_age' => 31536000,
+
+    // 'rate_limit_max' => 120,
+    // 'rate_limit_window' => 60,
+
+    // 'gc_tombstone_days' => 120,
+    // 'gc_space_days' => 240,
+];
