@@ -3,7 +3,7 @@ services:
     build: { context: ., target: web }
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-8082}:8080"
     depends_on: [php]
     read_only: true
     tmpfs: [/tmp]
@@ -17,7 +17,7 @@ services:
           "-q",
           "-O",
           "/dev/null",
-          "http://127.0.0.1:8080/api/health",
+          "http://127.0.0.1:8082/api/health",
         ]
       interval: 30s
       timeout: 5s
