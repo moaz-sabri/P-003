@@ -12,7 +12,7 @@
 // something the decision did not account for.
 //
 // IT RETURNS A `destroy` WHEN IT PAINTS A CLOCK, and every thirty seconds rather than
-// every second. A waiting goal says "opens in 1 day" and a rate-limited device says
+// every second. A waiting goal says "opens in 1 day" and a goal over its own cap says
 // "the next one opens in 3 hours"; both are painted once and left alone on a timer
 // that never fires, and the reader concludes the app has stopped counting. Nothing on
 // these lines is worth waking a phone for more often than half a minute, and a
@@ -147,9 +147,11 @@ export function goalActions({ goal, action, compact = false }) {
 
         case ACTION.RATE_LIMITED: {
             // The rate cap. Its own button and its own sentence, because it is not the
-            // same thing as the goal's interval: this goal is ready and the DEVICE is
-            // not, and a reader who fixed it by waiting a day would meet the same thing
-            // again if another goal had spent the slots.
+            // same thing as the goal's interval: this goal's interval has elapsed and
+            // this goal has been started three times in the last two days. It counts
+            // this goal's own exercises only, so a reader with three goals is not
+            // refused by one they have not opened — which is what the wording below
+            // says, and what it would not say if the cap were shared.
             const quota = action.quota ?? {};
             body.appendChild(h("p.small.muted", {
                 text: t("home.quota_line", {

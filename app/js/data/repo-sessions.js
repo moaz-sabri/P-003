@@ -59,23 +59,6 @@ export async function listExercises(goalId) {
 }
 
 /**
- * Every exercise on the device, newest first.
- *
- * The exercise history is cross-goal now that a reader can have several goals, and
- * "which exercises have I done" is a question the archive page and the reports
- * page both ask about the WHOLE device rather than one goal. It reads the
- * `createdAt` index rather than `getAll` so that the page showing the last twenty
- * sessions does not pull every attempt-bearing exercise to sort them.
- */
-export async function listAllExercises(limit = 0) {
-    const rows = await withTx(STORE.EXERCISES, "readonly", (tx, db) =>
-        db.byIndex(STORE.EXERCISES, "createdAt")
-    );
-    const answer = rows.filter(live).sort((a, b) => b.createdAt - a.createdAt || (b.id < a.id ? -1 : 1));
-    return limit > 0 ? answer.slice(0, limit) : answer;
-}
-
-/**
  * Write an exercise and its items together.
  *
  * `items` is `{questionId, kind, order, questionText, questionKind, options}`. The

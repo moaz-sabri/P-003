@@ -100,9 +100,14 @@ export async function listGoals() {
  * The goals that are still being worked on: active, and not archived.
  *
  * This is the list every screen that has to choose a goal reads. More than one can
- * be in it — several goals at once is allowed — so callers that genuinely need
- * ONE goal ask `getActiveGoal`, which takes the newest, and pages that need all
- * of them iterate.
+ * be in it — several goals at once is the normal case, up to `MAX_ACTIVE_GOALS` of
+ * them — so callers that genuinely need ONE goal ask `getActiveGoal`, which takes
+ * the newest, and pages that need all of them iterate.
+ *
+ * THE LIMIT IS NOT HERE. This read answers what exists and the number of things it
+ * returns is not a rule about what may be written; `goal-service` decides that, in
+ * `createGoal` and in the successor written when a goal is closed, so that a
+ * repository read is never the thing enforcing a product decision.
  */
 export async function listActiveGoals() {
     const rows = await withTx(STORE.GOALS, "readonly", (tx, db) =>

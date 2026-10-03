@@ -78,13 +78,11 @@ export async function render() {
  * One goal's whole card: its state, what can be done about it, and how far along it
  * is.
  *
- * THE STATE LINE IS BUILT FROM ONE DECISION AND TWO NUMBERS, and they are different
- * questions. `goalAction` says what may be done; the schedule asked whether this
- * goal's own interval has elapsed while the quota asked whether the reader has
- * started too many exercises anywhere on this device recently. A reader over the rate
- * is refused by every goal at once, so a card that only showed its own schedule would
- * say "ready" on a page where every Start button is dead — and the button being dead
- * with no explanation is the bug this split exists to prevent.
+ * THE STATE LINE IS BUILT FROM ONE DECISION, which is `goalAction` over `plan` and
+ * `quota`, and it is asked once per card. The schedule answers whether this goal's own
+ * interval has elapsed and the quota answers whether this goal has been started too
+ * often in the last two days; they are different questions with different sentences,
+ * and a card that answered only the first would offer a Start the service refuses.
  *
  * `compact` is set on the action block: the home page offers a Start and a resume,
  * and the "choose what to be asked" button belongs on the goal's own page, which is
@@ -96,8 +94,13 @@ async function goalCard(row) {
     const drawn = goalActions({ goal, action, compact: true });
 
     const body = h("div.stack-tight");
+    // THE TITLE IS THE LINK, and the quiet "Open" button beside it is kept for the
+    // reader who looks for one. A reader who came to the home page to work on one
+    // particular goal aims at the name they are reading, and a name that is not a link
+    // makes them find the button instead — on a card whose whole width is available.
     body.appendChild(h("div.row-between", null,
-        h("h2", { style: { "margin": "0" }, text: goal.title }),
+        h("h2", { style: { "margin": "0" } },
+            link(`/goal/${encodeURIComponent(goal.id)}`, goal.title)),
         link(`/goal/${encodeURIComponent(goal.id)}`, t("goal.open_button"), { class: "btn btn-quiet" })
     ));
 

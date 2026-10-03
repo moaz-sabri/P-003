@@ -28,10 +28,11 @@ export const SCHEDULE = {
     READY: "ready",
     /** An exercise is finished and its interval has not elapsed. */
     WAITING: "waiting",
-    /** The reader has started too many exercises too recently, anywhere on this
-     *  device. Checked AFTER `waiting`, because a goal waiting for its own interval
-     *  has a date to give the reader and the cap does not need one — the cap's date
-     *  is about the other goals. */
+    /** The reader has started too many exercises of THIS goal too recently. Checked
+     *  AFTER `waiting`, because a goal waiting for its own interval has a date to
+     *  give the reader and the cap does not need one — the cap's date is when this
+     *  goal's oldest exercise leaves the window, and that is a real date too, but a
+     *  goal waiting for its own interval is the earlier of the two. */
     RATE_LIMITED: "rate_limited",
     /** The goal is closed. History is kept; nothing new is built. */
     COMPLETED: "goal_completed",
@@ -149,12 +150,11 @@ export function isExpired(goal, now = Date.now()) {
  * The whole answer to "what should the Exercise button do?", in one value.
  *
  * `quota` IS PASSED IN rather than computed here, and that is the shape the rule
- * forces. The cap is over exercises started on the whole DEVICE — a reader with two
- * goals has one allowance between them, or the cap would mean three per goal and the
- * limit in the app's own description would be a lie — so it cannot be derived from
- * the goal's own `exercises` and computing it here would make the two screens that
- * ask this question read different data. The caller reads it once and hands it in;
- * this function stays a pure answer about one goal.
+ * forces. The cap is over the exercises started for THIS GOAL — one allowance each,
+ * so that a reader with three goals is not refused by a goal they have not touched —
+ * so it could be derived from the goal's own `exercises`, but computing it here
+ * would make the pages that ask this question read a second time. The caller reads
+ * it once and hands it in; this function stays a pure answer about one goal.
  *
  * @param {{goal: object|null, exercises: object[], quota?: object|null, now?: number}} input
  * @returns {{state: string, exercise?: object, open: object[], dueAt?: number,
@@ -201,9 +201,9 @@ export function planSchedule({ goal, exercises = [], quota = null, now = Date.no
         if (now < dueAt) {
             // WAITING IS RETURNED BEFORE THE CAP IS LOOKED AT, and that ordering is the
             // whole of what makes the two states readable. A goal waiting for its own
-            // interval has a DATE to give the reader; the cap's date is about other
-            // goals, and a sentence about the cap would send them away for a day and
-            // have them meet exactly the same thing.
+            // interval has a DATE to give the reader; the cap is about how fast this
+            // goal has been worked, and a sentence about it would send them away for a
+            // window and have them meet exactly the same thing.
             return { ...tail, state: SCHEDULE.WAITING, exercise: finished, dueAt };
         }
     }

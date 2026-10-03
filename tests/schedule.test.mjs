@@ -121,10 +121,10 @@ test("an open exercise is never the anchor for the interval", () => {
 });
 
 test("the cap is what refuses, and it is the caller's quota", () => {
-    // The cap is over the whole DEVICE, so it cannot be derived from this goal's
-    // exercises and `planSchedule` takes it as an argument. A goal with three fresh
-    // exercises of its own and no quota offered is READY; the same three passed
-    // through the cap is RATE_LIMITED.
+    // The cap is over the exercises of ONE goal, so `planSchedule` takes it as an
+    // argument rather than deriving it: a goal with three fresh exercises of its own
+    // and no quota offered is READY; the same three put through the cap are
+    // RATE_LIMITED.
     const three = [exercise(1, { created: 0.2 }), exercise(2, { created: 0.6 }), exercise(3, { created: 1.1 })];
     assert.equal(planSchedule({ goal: GOAL, exercises: three }).state, SCHEDULE.READY);
 
@@ -139,6 +139,31 @@ test("the cap is what refuses, and it is the caller's quota", () => {
     // And a quota with room does not refuse, so a stale quota from a page that was
     // left open cannot lock a reader out of an exercise the cap has since cleared.
     assert.equal(planSchedule({ goal: GOAL, quota: exerciseQuota([]) }).state, SCHEDULE.READY);
+});
+
+test("a goal made this morning has no date to be refused with", () => {
+    // THE REPORTED BUG, stated as the rule that prevents it. The allowance used to be
+    // counted over every exercise on the device, so a goal created this morning —
+    // with none of its own — inherited another goal's spent cap and opened on "the next
+    // one opens in 1d 12h" over a Start button that the service then refused. Nothing
+    // about that sentence was true of the goal it was printed on.
+    //
+    // The two halves of the fix, in the order they matter: the quota a goal is handed
+    // is counted from ITS OWN exercises, and a goal with none has nothing to wait for.
+    const fresh = planSchedule({ goal: { ...GOAL, id: "g2" }, exercises: [], quota: exerciseQuota([]) });
+    assert.equal(fresh.state, SCHEDULE.READY);
+    assert.equal(fresh.dueAt, 0, "a goal with no exercises was given a date to come back on");
+    assert.ok(canStartNewExercise(fresh));
+
+    // Its own three exercises DO refuse it, which is the difference between a cap and
+    // a shared budget: the number is the same either way, and what it is counting is
+    // not.
+    const own = [exercise(1, { created: 0.2 }), exercise(2, { created: 0.6 }), exercise(3, { created: 1.1 })];
+    assert.equal(
+        planSchedule({ goal: GOAL, exercises: own, quota: exerciseQuota(own) }).state,
+        SCHEDULE.RATE_LIMITED,
+        "the cap stopped counting this goal's own exercises, so nothing is bounded"
+    );
 });
 
 test("waiting outranks the cap, because it has a date and the cap does not need one", () => {

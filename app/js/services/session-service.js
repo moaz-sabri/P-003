@@ -60,7 +60,7 @@ import { addDays } from "../domain/time.js";
 import { getGoal, goalRefsFor } from "../data/repo-goals.js";
 import { listQuestions, listAllOptions, orderOptions } from "../data/repo-questions.js";
 import {
-    getExercise, listExercises, listAllExercises, listAllAttempts,
+    getExercise, listExercises, listAllAttempts,
     createExercise as createExerciseRecord, completeExercise, listItems, recordAttempt,
     listAttempts, setSourceExercise
 } from "../data/repo-sessions.js";
@@ -145,12 +145,14 @@ export async function start({ goalId, groupIds = null, questionIds = null, exclu
     if (goal.status === "completed") throw new ScheduleError("goal_completed");
     if (goal.archivedAt) throw new ScheduleError("goal_archived");
 
-    // The goal's own exercises AND every exercise on the device, read together: the
-    // first decides the interval, the second decides the cap, and reading them at
-    // different moments is how a reader gets past one rule and is stopped by the
-    // other with no explanation of which.
-    const [exercises, device] = await Promise.all([listExercises(goal.id), listAllExercises()]);
-    const quota = exerciseQuota(device);
+    // The goal's OWN exercises, and only those: the interval is measured from them and
+    // so is the rate cap. The cap used to be counted over every exercise on the device,
+    // which meant a goal created this morning could not be started at all because a
+    // different goal had been worked hard in the last two days -- and the refusal came
+    // from here as a toast on a Start button the page had drawn as live, because the
+    // page had counted the same way and the count was about somebody else's work.
+    const exercises = await listExercises(goal.id);
+    const quota = exerciseQuota(exercises);
     const plan = planSchedule({ goal, exercises, quota });
 
     // AN OPEN EXERCISE NO LONGER BLOCKS A NEW ONE. It used to, and that was the rule
@@ -214,7 +216,11 @@ export async function start({ goalId, groupIds = null, questionIds = null, exclu
         excludeIds
     });
 
-    return { exercise, plan: built, quota: exerciseQuota([...device, exercise]) };
+    // What is left of the allowance AFTER this one, which is the only figure the
+    // reader can act on: "2 of 3 left" tells them to start the one they meant rather
+    // than the one they happened to open. Counted over the goal's own exercises for
+    // the reason `start` counts over them.
+    return { exercise, plan: built, quota: exerciseQuota([...exercises, exercise]) };
 }
 
 /**
@@ -253,11 +259,12 @@ export async function repeat(exerciseId, { rand = Math.random } = {}) {
     if (goal.status === "completed") throw new ScheduleError("goal_completed");
     if (goal.archivedAt) throw new ScheduleError("goal_archived");
 
-    // Device-wide, for the same reason `start` reads it that way: the cap is one
-    // allowance between the reader's goals, so a repeat on goal B spends a slot
-    // that goal A has already spent.
-    const [exercises, device] = await Promise.all([listExercises(goal.id), listAllExercises()]);
-    const quota = exerciseQuota(device);
+    // THE GOAL'S OWN EXERCISES, for the same reason `start` counts over them: the cap is
+    // an allowance for this goal and not a shared budget, so a repeat on goal B does
+    // not spend a slot goal A has already spent, and a repeat on goal A is not refused
+    // by goal B's evening.
+    const exercises = await listExercises(goal.id);
+    const quota = exerciseQuota(exercises);
     if (quota.blocked) throw new ScheduleError("too_many_exercises", { quota });
 
     const originalItems = await listItems(exerciseId);

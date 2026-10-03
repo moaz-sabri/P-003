@@ -34,14 +34,16 @@ import { SCHEDULE } from "./schedule.js";
  *                   tell them apart.
  *  RESUME_OR_START  ready, nothing open. One button.
  *  WAITING          this goal's interval has not elapsed. It has a date to give.
- *  RATE_LIMITED     the DEVICE is over the cap, which is about the other goals and
- *                   cannot be fixed by waiting a day for this one.
+ *  RATE_LIMITED     this goal has been worked too fast: three exercises of it started
+ *                   inside the window, so a fourth would not leave time to do it. It is
+ *                   about THIS goal's own exercises and nothing else — a reader with
+ *                   three goals is not refused by one they have not opened.
  *
  * WAITING IS CHECKED BEFORE RATE_LIMITED, and it is `schedule.js` that does the
  * ordering; this function only reports what it was told. It is repeated here because
- * the ORDER is part of the answer: a goal waiting for its own interval and a device
- * over the cap need two different sentences, and getting them the wrong way round is
- * how a reader is told to wait a day for something that will not have changed. */
+ * the ORDER is part of the answer: a goal waiting for its own interval and a goal over
+ * its own cap need two different sentences, and getting them the wrong way round is
+ * how a reader is told to wait a window for something that will not have changed. */
 export const ACTION = {
     NO_GOAL: "no_goal",
     CLOSED: "closed",
@@ -71,7 +73,8 @@ export function canStart(decision) {
  * @param {object|null} input.plan        from `planSchedule`
  * @param {number} input.materialCount    questions attached to this goal
  * @param {object[]} input.open           exercises still in progress, newest first
- * @param {object|null} input.quota       the device-wide allowance
+ * @param {object|null} input.quota       this goal's allowance, from `exerciseQuota` over
+ *                                        its own exercises
  * @returns {{action: string, open: object[], dueAt?: number, endsAt?: number,
  *           quota?: object|null, hasMaterial?: boolean}}
  */

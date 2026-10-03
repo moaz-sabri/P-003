@@ -43,7 +43,7 @@ import { t, formatDate, formatDateTime, formatPercent } from "../../i18n/i18n.js
 import { LIMITS } from "../../domain/validation.js";
 import { goalAction } from "../../domain/goal-action.js";
 import {
-    overview, updatePlan, finishGoal, archiveGoal, unarchiveGoal, SCHEDULE
+    overview, updatePlan, finishAndSucceed, archiveAndSucceed, unarchive, SCHEDULE
 } from "../../services/goal-service.js";
 import * as sessions from "../../services/session-service.js";
 import { go } from "../../app/router.js";
@@ -62,6 +62,14 @@ import { setCurrentGoal } from "../nav.js";
  *   finish     the plan's own time is up, so it closes. Not reversible, and it
  *              offers a new goal because it is finished.
  *   delete     the goal was a mistake. Refused outright — see `notDeletable`.
+ *
+ * ARCHIVE AND FINISH BOTH WRITE A SUCCESSOR, and that is not decoration on the two
+ * buttons but where the goal limit is actually enforced. Three goals can be worked on
+ * at once, so closing one frees a slot, and the reader who closed it closed it
+ * because they are going on with the same subject. The replacement is written in the
+ * same breath with the same plan and the same shelves attached, and the page goes to
+ * it — so "finish" ends a round and begins the next one, instead of ending a round
+ * and showing a list of two.
  */
 export async function render(ctx) {
     const id = ctx?.route?.params?.id ?? null;
@@ -272,8 +280,8 @@ async function repeatExercise(event, exercise) {
     } catch (err) {
         button.disabled = false;
         toast.error(err);
-        // The cap is device-wide, so a refusal here can be about another goal's
-        // spending rather than this one. The home page redraws from the decision.
+        // The cap is one allowance per goal, so a refusal here is about THIS goal's own
+        // three exercises and nothing else. The home page redraws from the decision.
         if (err?.code === "too_many_exercises") go("/");
     }
 }
@@ -372,6 +380,14 @@ function planForm(goal) {
  * FINISH IS SECOND and it refuses while anything is open, as it always did — but the
  * message it gives now says what to do instead, because the thing to do instead
  * exists.
+ *
+ * BOTH OF THEM LEAVE A GOAL BEHIND, and neither asks the reader to make the
+ * replacement. Closing a goal frees one of the three active slots, and the reader who
+ * closed it closed it because they are going on with the same subject — so
+ * `archiveAndSucceed` / `finishAndSucceed` write the successor in the same breath, with
+ * the same plan and the same questions already attached, and the page goes to it. The
+ * alternative is a reader who has just finished a plan being shown a list of two goals
+ * and a form, on the day they meant to start the next round.
  */
 function actionsSection(goal, open) {
     const parts = [];
@@ -383,7 +399,7 @@ function actionsSection(goal, open) {
             onclick: async (event) => {
                 event.currentTarget.disabled = true;
                 try {
-                    await unarchiveGoal(goal.id);
+                    await unarchive(goal.id);
                     toast.show("toast.goal_unarchived");
                     go(`/goal/${encodeURIComponent(goal.id)}`);
                 } catch (err) {
@@ -398,9 +414,9 @@ function actionsSection(goal, open) {
             bodyKey: "goal.archive_body"
         }, async () => {
             try {
-                await archiveGoal(goal.id);
+                const { next } = await archiveAndSucceed(goal.id);
                 toast.show("toast.goal_archived");
-                go("/archive");
+                leaveAfterClose(next);
             } catch (err) {
                 toast.error(err);
             }
@@ -414,9 +430,9 @@ function actionsSection(goal, open) {
                     bodyKey: "goal.finish_body"
                 }, async () => {
                     try {
-                        await finishGoal(goal.id);
+                        const { next } = await finishAndSucceed(goal.id);
                         toast.show("toast.goal_finished");
-                        go("/goal");
+                        leaveAfterClose(next);
                     } catch (err) {
                         toast.error(err);
                     }
@@ -434,6 +450,28 @@ function actionsSection(goal, open) {
     return section("goal.actions_heading", card(
         h("div.stack-tight", null, ...parts.filter(Boolean))
     ));
+}
+
+/**
+ * Where the reader lands after closing a goal: on the successor when there was one,
+ * and on the list when there was not.
+ *
+ * `next` IS THE RECORD THE SERVICE JUST WROTE, not a goal found by looking at the
+ * list afterwards. Re-reading would mean guessing which of the active goals is the new
+ * one — and the guess is "the newest", which is wrong the moment two goals share a
+ * creation millisecond, which is exactly what happens when a reader makes three goals
+ * in one sitting.
+ *
+ * No successor means the device is at the limit of three, so the list is the only
+ * place a goal can be made from, and it is the page that says the limit.
+ */
+function leaveAfterClose(next) {
+    if (next) {
+        toast.show("toast.goal_succeeded");
+        go(`/goal/${encodeURIComponent(next.id)}`);
+        return;
+    }
+    go("/goal");
 }
 
 /**

@@ -268,7 +268,18 @@ export function hasAnythingToAsk(plan) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many exercises may still be STARTED, and when the next one may be.
+ * How many exercises of ONE goal may still be STARTED, and when the next one may be.
+ *
+ * PER GOAL, AND THAT IS THE WHOLE OF THE FIX. The list handed in used to be every
+ * exercise on the device, so the allowance was one between all of the reader's goals,
+ * and a goal created this morning could open on "the next one opens in 1d 12h" because
+ * a DIFFERENT goal had started three exercises in the last two days. Nothing about
+ * that was true of the new goal: it had none, and a goal with none is READY. The
+ * sentence was about somebody else's work.
+ *
+ * One allowance each is also the only version of the number that means anything on a
+ * screen. "Three in two days" beside three goals reads as three apiece; beside one it
+ * reads as three, which is what the reader is being asked to accept.
  *
  * THE RULE IS NOT "ONE AT A TIME". It was, and it is now: several exercises may
  * be open on one goal at the same time, because a reader who wants to work ahead
@@ -288,6 +299,11 @@ export function hasAnythingToAsk(plan) {
  * it. A started-but-abandoned exercise has still been built, and building it is
  * what the cap exists to bound; counting completions instead would let a reader
  * open ten exercises and answer none of them.
+ *
+ * IT IS THE GOAL'S OWN EXERCISES that are counted, and this function does not know
+ * that: it is handed a list and answers about the list. Which list is the caller's
+ * decision, and it is the one place in this app where handing it the whole device
+ * produces a screen that is true of nothing the reader is looking at.
  *
  * TOMBSTONES DO NOT COUNT, and that is a decision rather than an oversight. A
  * tombstoned exercise is one that is gone from this device, usually because a goal

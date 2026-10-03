@@ -53,15 +53,21 @@ export const BACKUP_REMINDER_DAYS = 30;
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many exercises one goal may START inside a rolling window, and how long
+ * How many exercises ONE goal may START inside a rolling window, and how long
  * that window is.
  *
- * THE CAP IS ON THE RATE, NOT ON HOW MANY MAY BE OPEN. It used to be one open
- * exercise at a time, which meant a reader who wanted to work through two sessions
- * in one evening could not, and the only feedback was a button that would not
- * press. Several exercises may now be open at once; what is bounded is how fast
- * new ones can be started, which is the thing that actually protects a reader
- * from queueing forty sessions they will never reach.
+ * THE CAP IS ON THE RATE, NOT ON HOW MANY MAY BE OPEN, AND NOT ON HOW MANY GOALS
+ * EXIST. It used to be one open exercise at a time, which meant a reader who wanted to
+ * work through two sessions in one evening could not, and the only feedback was a
+ * button that would not press. Several exercises may now be open at once; what is
+ * bounded is how fast new ones can be started, which is the thing that actually
+ * protects a reader from queueing forty sessions they will never reach.
+ *
+ * PER GOAL, NOT PER DEVICE. The allowance was one between all of the reader's goals,
+ * which made a goal created this morning open on "the next one opens in 1d 12h" because
+ * another goal had been worked hard — a sentence about somebody else's exercises,
+ * printed above a Start button on a goal that had never been started. Three each is
+ * also the only reading of the number that survives being drawn next to several goals.
  *
  * THREE IN TWO DAYS. Two is a real number rather than a round one, and it is the
  * smallest number that lets a reader finish a session on one evening and start the
@@ -74,6 +80,23 @@ export const MAX_EXERCISES_PER_WINDOW = 3;
  *  a calendar reset hands out five sessions to a reader who finished one at 23:50
  *  and started four at 00:05, which is the opposite of what the number is for. */
 export const EXERCISE_WINDOW_DAYS = 2;
+
+/**
+ * How many goals may be worked on at once.
+ *
+ * THREE, AND NOT "AS MANY AS YOU LIKE". A goal is a plan with its own schedule, its
+ * own exercises and its own report, and past three the home page stops being a page a
+ * person reads: it becomes a list they scroll to find the one they meant. The cap is
+ * what makes "the next exercise" on the home page an answer rather than a queue.
+ *
+ * IT IS NOT A QUOTA ON MATERIAL. Questions belong to no goal, so three goals and two
+ * hundred questions is a perfectly ordinary device, and archiving or finishing one to
+ * make room for another loses nothing at all.
+ *
+ * CLOSING A GOAL FREES A SLOT, and `goal-service`'s successor writes into it at once:
+ * a reader who archives a goal to start another does not have to go and make one.
+ */
+export const MAX_ACTIVE_GOALS = 3;
 
 /* -------------------------------------------------------------------------- */
 /*                              goals and exercises                            */
