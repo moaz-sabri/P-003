@@ -1,0 +1,207 @@
+{
+    "name": "Management & Job Acronyms",
+    "description": "A comprehensive test covering executive job titles, Agile & Scrum roles, performance metrics, and business operations acronyms.",
+    "subject": "Business Management & Operations",
+    "questions": [
+        {
+            "text": "What does CTO stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Chief Technology Officer", "isCorrect": true },
+                { "text": "Chief Technical Operations", "isCorrect": false },
+                { "text": "Central Technology Organizer", "isCorrect": false },
+                { "text": "Chief Operations Officer", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does PM stand for in product and project management?",
+            "kind": "multiple",
+            "options": [
+                { "text": "Project Manager", "isCorrect": true },
+                { "text": "Product Manager", "isCorrect": true },
+                { "text": "Process Master", "isCorrect": false },
+                { "text": "Performance Monitor", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "In Scrum and Agile frameworks, what does PO stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Product Owner", "isCorrect": true },
+                { "text": "Project Organizer", "isCorrect": false },
+                { "text": "Process Owner", "isCorrect": false },
+                { "text": "Program Officer", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does CEO stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Chief Executive Officer", "isCorrect": true },
+                { "text": "Chief Enterprise Officer", "isCorrect": false },
+                { "text": "Central Executive Organizer", "isCorrect": false },
+                { "text": "Chief Efficiency Officer", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of the following belong to C-level executive management (C-Suite)?",
+            "kind": "multiple",
+            "options": [
+                { "text": "CFO (Chief Financial Officer)", "isCorrect": true },
+                { "text": "COO (Chief Operating Officer)", "isCorrect": true },
+                { "text": "QA (Quality Assurance)", "isCorrect": false },
+                { "text": "HR (Human Resources)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does KPI stand for in performance management?",
+            "kind": "single",
+            "options": [
+                { "text": "Key Performance Indicator", "isCorrect": true },
+                { "text": "Key Process Integration", "isCorrect": false },
+                { "text": "Known Performance Index", "isCorrect": false },
+                { "text": "Key Project Instruction", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does OKR stand for in goal-setting frameworks?",
+            "kind": "single",
+            "options": [
+                { "text": "Objectives and Key Results", "isCorrect": true },
+                { "text": "Organization Key Resources", "isCorrect": false },
+                { "text": "Operational Knowledge Review", "isCorrect": false },
+                { "text": "Outcome and Key Requirements", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "In finance and business analysis, what does ROI mean?",
+            "kind": "single",
+            "options": [
+                { "text": "Return on Investment", "isCorrect": true },
+                { "text": "Rate of Inflation", "isCorrect": false },
+                { "text": "Risk of Insolvency", "isCorrect": false },
+                { "text": "Resource Operational Index", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is an MVP in startups and software development?",
+            "kind": "single",
+            "options": [
+                { "text": "Minimum Viable Product", "isCorrect": true },
+                { "text": "Most Valuable Project", "isCorrect": false },
+                { "text": "Maximum Value Process", "isCorrect": false },
+                { "text": "Main Verification Phase", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are recognized Scrum framework roles?",
+            "kind": "multiple",
+            "options": [
+                { "text": "Product Owner", "isCorrect": true },
+                { "text": "Scrum Master", "isCorrect": true },
+                { "text": "Project Director", "isCorrect": false },
+                { "text": "General Manager", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does SLA stand for in customer support and operations?",
+            "kind": "single",
+            "options": [
+                { "text": "Service Level Agreement", "isCorrect": true },
+                { "text": "System Logic Architecture", "isCorrect": false },
+                { "text": "Standard Licensing Agency", "isCorrect": false },
+                { "text": "Software Lifetime Allocation", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "In digital products and design, what does UX stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "User Experience", "isCorrect": true },
+                { "text": "User Extension", "isCorrect": false },
+                { "text": "Universal Execution", "isCorrect": false },
+                { "text": "Unified Exploration", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which business models involve direct sales to end consumers or other businesses?",
+            "kind": "multiple",
+            "options": [
+                { "text": "B2B (Business-to-Business)", "isCorrect": true },
+                { "text": "B2C (Business-to-Consumer)", "isCorrect": true },
+                { "text": "KPI (Key Performance Indicator)", "isCorrect": false },
+                { "text": "SLA (Service Level Agreement)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does CRM stand for in sales and management systems?",
+            "kind": "single",
+            "options": [
+                { "text": "Customer Relationship Management", "isCorrect": true },
+                { "text": "Central Resource Mapping", "isCorrect": false },
+                { "text": "Corporate Risk Management", "isCorrect": false },
+                { "text": "Client Retention Method", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does QA stand for in software testing and manufacturing?",
+            "kind": "single",
+            "options": [
+                { "text": "Quality Assurance", "isCorrect": true },
+                { "text": "Quantitative Analysis", "isCorrect": false },
+                { "text": "Quick Assessment", "isCorrect": false },
+                { "text": "Query Automation", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does ERP stand for in enterprise operations management?",
+            "kind": "single",
+            "options": [
+                { "text": "Enterprise Resource Planning", "isCorrect": true },
+                { "text": "Efficient Result Process", "isCorrect": false },
+                { "text": "Executive Reporting Platform", "isCorrect": false },
+                { "text": "External Resource Provider", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does CMO stand for in corporate marketing?",
+            "kind": "single",
+            "options": [
+                { "text": "Chief Marketing Officer", "isCorrect": true },
+                { "text": "Chief Media Operator", "isCorrect": false },
+                { "text": "Central Market Organizer", "isCorrect": false },
+                { "text": "Chief Management Officer", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does HR stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Human Resources", "isCorrect": true },
+                { "text": "High Risk", "isCorrect": false },
+                { "text": "Human Relations", "isCorrect": false },
+                { "text": "Head Region", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which acronyms refer to marketing and user acquisition strategies?",
+            "kind": "multiple",
+            "options": [
+                { "text": "SEO (Search Engine Optimization)", "isCorrect": true },
+                { "text": "SEM (Search Engine Marketing)", "isCorrect": true },
+                { "text": "CFO (Chief Financial Officer)", "isCorrect": false },
+                { "text": "SDK (Software Development Kit)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does PR stand for in corporate communications?",
+            "kind": "single",
+            "options": [
+                { "text": "Public Relations", "isCorrect": true },
+                { "text": "Product Release", "isCorrect": false },
+                { "text": "Process Review", "isCorrect": false },
+                { "text": "Performance Rating", "isCorrect": false }
+            ]
+        }
+    ]
+}

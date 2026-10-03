@@ -1,0 +1,127 @@
+{
+    "name": "صفات ومعرفة الحيوانات",
+    "description": "اختبار حول خصائص وسلوكيات وصفات الحيوانات المختلفة في البر والبحر الجو للتعرف عليها.",
+    "subject": "عالم الحيوان والأحياء",
+    "questions": [
+        {
+            "text": "ما هو أكبر حيوان ثديي على وجه الأرض؟",
+            "kind": "single",
+            "options": [
+                { "text": "الحوت الأزرق", "isCorrect": true },
+                { "text": "الفيل الأفريقي", "isCorrect": false },
+                { "text": "قرش التايجر", "isCorrect": false },
+                { "text": "فرس النهر", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو أسرع حيوان بري في العالم؟",
+            "kind": "single",
+            "options": [
+                { "text": "الفهد (الشيتا)", "isCorrect": true },
+                { "text": "الأسد", "isCorrect": false },
+                { "text": "الغزال", "isCorrect": false },
+                { "text": "الخيول الأصيلة", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من الحيوانات التالية تُصنف كحيوانات مفترسة (آكلات لحوم)؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "الأسد", "isCorrect": true },
+                { "text": "النمر", "isCorrect": true },
+                { "text": "الزرافة", "isCorrect": false },
+                { "text": "الحمار الوحشي", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الثديي الوحيد الذي يستطيع الطيران بحرية؟",
+            "kind": "single",
+            "options": [
+                { "text": "الخفاش", "isCorrect": true },
+                { "text": "السنجاب الطائر", "isCorrect": false },
+                { "text": "النسر", "isCorrect": false },
+                { "text": "البوم", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الحيوان المعروف بـ 'سفينة الصحراء' ويمتلك سناماً لتخزين الدهون؟",
+            "kind": "single",
+            "options": [
+                { "text": "الجمل", "isCorrect": true },
+                { "text": "الحصان", "isCorrect": false },
+                { "text": "الضبع", "isCorrect": false },
+                { "text": "الوعل", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الكائن البحري الذكي الذي يمتلك 8 أذرع ويستطيع تغيير لونه وإطلاق الحبر؟",
+            "kind": "single",
+            "options": [
+                { "text": "الأخطبوط", "isCorrect": true },
+                { "text": "قنديل البحر", "isCorrect": false },
+                { "text": "نجم البحر", "isCorrect": false },
+                { "text": "الحبار القزم", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من الحيوانات التالية ينتمي لفئة ذوات الدم البارد (الزواحف)؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "الثعبان", "isCorrect": true },
+                { "text": "التمساح", "isCorrect": true },
+                { "text": "الدلفين", "isCorrect": false },
+                { "text": "الكلب", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الزاحف المشهور بقدرته الفائقة على تغيير لون جلده للتمويه؟",
+            "kind": "single",
+            "options": [
+                { "text": "الحرباء", "isCorrect": true },
+                { "text": "الضب", "isCorrect": false },
+                { "text": "التمساح", "isCorrect": false },
+                { "text": "السلاحف البرية", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الطائر الذي لا يستطيع الطيران ولكنه سباح ماهر ويعيش في المناطق القطبية؟",
+            "kind": "single",
+            "options": [
+                { "text": "البطريق", "isCorrect": true },
+                { "text": "النعامة", "isCorrect": false },
+                { "text": "الطاووس", "isCorrect": false },
+                { "text": "الكيوي", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الحيوان الأسترالي الشهير الذي يحمل صغاره داخل جراب (جيب) في بطنه؟",
+            "kind": "single",
+            "options": [
+                { "text": "الكانغر", "isCorrect": true },
+                { "text": "الكوينز", "isCorrect": false },
+                { "text": "الدب القطبي", "isCorrect": false },
+                { "text": "الفهد", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من الحيوانات التالية تُعرف بكونها حيوانات برمائية (تعيش في الماء وعلى اليابسة)؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "الضفدع", "isCorrect": true },
+                { "text": "السمندر", "isCorrect": true },
+                { "text": "الحوت", "isCorrect": false },
+                { "text": "القرش", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو الحيوان المعروف بذكائه الشديد ومساعدته للإنسان في البحر؟",
+            "kind": "single",
+            "options": [
+                { "text": "الدلفين", "isCorrect": true },
+                { "text": "قرش الحوت", "isCorrect": false },
+                { "text": "فقمة البحر", "isCorrect": false },
+                { "text": "عروس البحر", "isCorrect": false }
+            ]
+        }
+    ]
+}

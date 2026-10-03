@@ -1,0 +1,107 @@
+{
+    "name": "مصطلحات وإختصارات الإدارة والمهن",
+    "description": "اختبار شامل حول المسميات الوظيفية التنفيذية، أدوار Agile و Scrum، ومؤشرات الأداء وإدارة الأعمال.",
+    "subject": "إدارة الأعمال والعمليات",
+    "questions": [
+        {
+            "text": "ماذا يعني اختصار CTO؟",
+            "kind": "single",
+            "options": [
+                { "text": "رئيس قطاع التكنولوجيا (Chief Technology Officer)", "isCorrect": true },
+                { "text": "مدير العمليات التقنية (Chief Technical Operations)", "isCorrect": false },
+                { "text": "منسق التكنولوجيا المركزي (Central Technology Organizer)", "isCorrect": false },
+                { "text": "رئيس قسم العمليات (Chief Operations Officer)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ماذا يعني اختصار PM في مجال إدارة المشاريع والمنتجات؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "مدير مشروع (Project Manager)", "isCorrect": true },
+                { "text": "مدير منتج (Product Manager)", "isCorrect": true },
+                { "text": "موجه العمليات (Process Master)", "isCorrect": false },
+                { "text": "مراقب الأداء (Performance Monitor)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في أطر العمل المرنة (Agile & Scrum)، ماذا يعني اختصار PO؟",
+            "kind": "single",
+            "options": [
+                { "text": "مالك المنتج (Product Owner)", "isCorrect": true },
+                { "text": "منظم المشروع (Project Organizer)", "isCorrect": false },
+                { "text": "مالك العملية (Process Owner)", "isCorrect": false },
+                { "text": "مسؤول البرنامج (Program Officer)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ماذا يعني اختصار CEO؟",
+            "kind": "single",
+            "options": [
+                { "text": "المدير التنفيذي (Chief Executive Officer)", "isCorrect": true },
+                { "text": "رئيس إدارة المؤسسة (Chief Enterprise Officer)", "isCorrect": false },
+                { "text": "منظم الكادر التنفيذي (Central Executive Organizer)", "isCorrect": false },
+                { "text": "مسؤول الكفاءة العام (Chief Efficiency Officer)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من المسميات التالية تنتمي للإدارة التنفيذية العليا (C-Suite)؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "CFO (المدير المالي)", "isCorrect": true },
+                { "text": "COO (مدير العمليات)", "isCorrect": true },
+                { "text": "QA (ضمان الجودة)", "isCorrect": false },
+                { "text": "HR (الموارد البشرية)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ماذا يعني اختصار KPI في قياس الأداء؟",
+            "kind": "single",
+            "options": [
+                { "text": "مؤشر الأداء الرئيسي (Key Performance Indicator)", "isCorrect": true },
+                { "text": "مؤشر تكامل العمليات (Key Process Integration)", "isCorrect": false },
+                { "text": "دليل الأداء المعروف (Known Performance Index)", "isCorrect": false },
+                { "text": "تعليمات المشروع الأساسية (Key Project Instruction)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ماذا يعني اختصار OKR في تحديد الأهداف؟",
+            "kind": "single",
+            "options": [
+                { "text": "الأهداف والنتائج الرئيسية (Objectives and Key Results)", "isCorrect": true },
+                { "text": "الموارد الرئيسية للمؤسسة (Organization Key Resources)", "isCorrect": false },
+                { "text": "مراجعة المعرفة التشغيلية (Operational Knowledge Review)", "isCorrect": false },
+                { "text": "المخرجات المتوقعة والمتطلبات (Outcome and Key Requirements)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في التحليل المالي وإدارة الأعمال، ما المقصود باختصار ROI؟",
+            "kind": "single",
+            "options": [
+                { "text": "العائد على الاستثمار (Return on Investment)", "isCorrect": true },
+                { "text": "معدل التضخم (Rate of Inflation)", "isCorrect": false },
+                { "text": "مخاطر الإفلاس (Risk of Insolvency)", "isCorrect": false },
+                { "text": "مؤشر الموارد التشغيلية (Resource Operational Index)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما المقصود باختصار MVP في الشركات الناشئة وتطوير المنتجات؟",
+            "kind": "single",
+            "options": [
+                { "text": "الحد الأدنى من المنتج القابل للطلاق/التجربة (Minimum Viable Product)", "isCorrect": true },
+                { "text": "المشروع الأكثر قيمة (Most Valuable Project)", "isCorrect": false },
+                { "text": "عملية القيمة القصوى (Maximum Value Process)", "isCorrect": false },
+                { "text": "مرحلة التحقق الرئيسية (Main Verification Phase)", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هو اختصار CRM في نظم إدارة المبيعات والعلاقات؟",
+            "kind": "single",
+            "options": [
+                { "text": "إدارة علاقات العملاء (Customer Relationship Management)", "isCorrect": true },
+                { "text": "تخطيط الموارد المركزي (Central Resource Mapping)", "isCorrect": false },
+                { "text": "إدارة المخاطر المؤسسية (Corporate Risk Management)", "isCorrect": false },
+                { "text": "أسلوب الاحتفاظ بالعملاء (Client Retention Method)", "isCorrect": false }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,207 @@
+{
+    "name": "Programming Terminology",
+    "description": "A comprehensive quiz covering programming terms across web development, databases, OOP, and computer science basics.",
+    "subject": "Computer Science & Programming",
+    "questions": [
+        {
+            "text": "What does HTML stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "HyperText Markup Language", "isCorrect": true },
+                { "text": "HighText Machine Language", "isCorrect": false },
+                { "text": "HyperLoop Machine Language", "isCorrect": false },
+                { "text": "Home Tool Markup Language", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are considered Backend programming languages?",
+            "kind": "multiple",
+            "options": [
+                { "text": "Python", "isCorrect": true },
+                { "text": "Java", "isCorrect": true },
+                { "text": "HTML", "isCorrect": false },
+                { "text": "CSS", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is an 'Algorithm' in computer science?",
+            "kind": "single",
+            "options": [
+                { "text": "A step-by-step procedure for solving a problem", "isCorrect": true },
+                { "text": "A type of computer hardware", "isCorrect": false },
+                { "text": "A programming language", "isCorrect": false },
+                { "text": "A database management system", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "In databases, what uniquely identifies a record in a table?",
+            "kind": "single",
+            "options": [
+                { "text": "Primary Key", "isCorrect": true },
+                { "text": "Foreign Key", "isCorrect": false },
+                { "text": "Index", "isCorrect": false },
+                { "text": "Query", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are Relational Database Management Systems (RDBMS)?",
+            "kind": "multiple",
+            "options": [
+                { "text": "MySQL", "isCorrect": true },
+                { "text": "PostgreSQL", "isCorrect": true },
+                { "text": "MongoDB", "isCorrect": false },
+                { "text": "Redis", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does API stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Application Programming Interface", "isCorrect": true },
+                { "text": "Advanced Programming Integration", "isCorrect": false },
+                { "text": "Automated Program Interaction", "isCorrect": false },
+                { "text": "Application Process Interface", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is a 'Bug' in software development?",
+            "kind": "single",
+            "options": [
+                { "text": "An error, flaw, or fault in a computer program", "isCorrect": true },
+                { "text": "A feature requested by the user", "isCorrect": false },
+                { "text": "A physical insect inside the computer", "isCorrect": false },
+                { "text": "A type of loop in code", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are principles of Object-Oriented Programming (OOP)?",
+            "kind": "multiple",
+            "options": [
+                { "text": "Inheritance", "isCorrect": true },
+                { "text": "Polymorphism", "isCorrect": true },
+                { "text": "Compilation", "isCorrect": false },
+                { "text": "Execution", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does IDE stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Integrated Development Environment", "isCorrect": true },
+                { "text": "Internal Design Engine", "isCorrect": false },
+                { "text": "Internet Development Environment", "isCorrect": false },
+                { "text": "Interactive Debugging Execution", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is the main purpose of CSS?",
+            "kind": "single",
+            "options": [
+                { "text": "Styling and visually formatting web pages", "isCorrect": true },
+                { "text": "Creating database schemas", "isCorrect": false },
+                { "text": "Handling server-side logic", "isCorrect": false },
+                { "text": "Compiling source code", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are JavaScript frameworks or libraries?",
+            "kind": "multiple",
+            "options": [
+                { "text": "React", "isCorrect": true },
+                { "text": "Angular", "isCorrect": true },
+                { "text": "Django", "isCorrect": false },
+                { "text": "Laravel", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is a 'Compiler'?",
+            "kind": "single",
+            "options": [
+                { "text": "A program that translates source code into machine code", "isCorrect": true },
+                { "text": "A tool used to write text documents", "isCorrect": false },
+                { "text": "A type of web browser", "isCorrect": false },
+                { "text": "An antivirus software", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "In Git, which command is used to save changes locally?",
+            "kind": "single",
+            "options": [
+                { "text": "git commit", "isCorrect": true },
+                { "text": "git push", "isCorrect": false },
+                { "text": "git clone", "isCorrect": false },
+                { "text": "git pull", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What does SQL stand for?",
+            "kind": "single",
+            "options": [
+                { "text": "Structured Query Language", "isCorrect": true },
+                { "text": "Standard Question Language", "isCorrect": false },
+                { "text": "Simple Query Logic", "isCorrect": false },
+                { "text": "Server Query Language", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these represent Boolean values?",
+            "kind": "multiple",
+            "options": [
+                { "text": "true", "isCorrect": true },
+                { "text": "false", "isCorrect": true },
+                { "text": "100", "isCorrect": false },
+                { "text": "\"hello\"", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is JSON?",
+            "kind": "single",
+            "options": [
+                { "text": "JavaScript Object Notation", "isCorrect": true },
+                { "text": "Java Standard Output Network", "isCorrect": false },
+                { "text": "JavaScript Oriented Node", "isCorrect": false },
+                { "text": "Java Source Open Network", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is the process of finding and fixing errors in code called?",
+            "kind": "single",
+            "options": [
+                { "text": "Debugging", "isCorrect": true },
+                { "text": "Compiling", "isCorrect": false },
+                { "text": "Deploying", "isCorrect": false },
+                { "text": "Hosting", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is a 'Variable' in programming?",
+            "kind": "single",
+            "options": [
+                { "text": "A named storage location in memory for holding data", "isCorrect": true },
+                { "text": "A mathematical equation", "isCorrect": false },
+                { "text": "A hardware component", "isCorrect": false },
+                { "text": "A type of network protocol", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these are Version Control Systems?",
+            "kind": "multiple",
+            "options": [
+                { "text": "Git", "isCorrect": true },
+                { "text": "Subversion (SVN)", "isCorrect": true },
+                { "text": "Photoshop", "isCorrect": false },
+                { "text": "Microsoft Word", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is the DOM in web development?",
+            "kind": "single",
+            "options": [
+                { "text": "Document Object Model", "isCorrect": true },
+                { "text": "Data Object Management", "isCorrect": false },
+                { "text": "Design Oriented Module", "isCorrect": false },
+                { "text": "Display Output Mode", "isCorrect": false }
+            ]
+        }
+    ]
+}

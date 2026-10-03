@@ -1,0 +1,127 @@
+{
+    "name": "أشهر المعالم والبلدان",
+    "description": "اختبار معلومات عامة للتعرف على أشهر المعالم السياحية، الثقافات، والأطعمة والدول التي تنتمي إليها.",
+    "subject": "الجغرافيا والمعلومات العامة",
+    "questions": [
+        {
+            "text": "في أي دولة يقع 'برج إيفل' الشهير؟",
+            "kind": "single",
+            "options": [
+                { "text": "فرنسا", "isCorrect": true },
+                { "text": "إيطاليا", "isCorrect": false },
+                { "text": "إسبانيا", "isCorrect": false },
+                { "text": "ألمانيا", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من المعالم التالية تقع في إيطاليا؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "برج بيزا المائل", "isCorrect": true },
+                { "text": "مبنى الكولوسيوم", "isCorrect": true },
+                { "text": "قصر الحمراء", "isCorrect": false },
+                { "text": "ساعة بيغ بن", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هي الدولة المشهورة برياضة السوموا، أزهار الساكورا، وجبة السوشي؟",
+            "kind": "single",
+            "options": [
+                { "text": "اليابان", "isCorrect": true },
+                { "text": "الصين", "isCorrect": false },
+                { "text": "كوريا الجنوبية", "isCorrect": false },
+                { "text": "تايلاند", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في أي دولة تقع أهرامات الجيزة وقمة أبوالهول؟",
+            "kind": "single",
+            "options": [
+                { "text": "مصر", "isCorrect": true },
+                { "text": "السودان", "isCorrect": false },
+                { "text": "المكسيك", "isCorrect": false },
+                { "text": "الأردن", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من الدول التالية تشتهر بصناعة الساعات الفاخرة والشوكولاتة وجبال الألب؟",
+            "kind": "single",
+            "options": [
+                { "text": "سويسرا", "isCorrect": true },
+                { "text": "النمسا", "isCorrect": false },
+                { "text": "بلجيكا", "isCorrect": false },
+                { "text": "السويد", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في أي دولة يقع قصر 'تاج محل'؟",
+            "kind": "single",
+            "options": [
+                { "text": "الهند", "isCorrect": true },
+                { "text": "باكستان", "isCorrect": false },
+                { "text": "إندونيسيا", "isCorrect": false },
+                { "text": "تركيا", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من المعالم التالية تقع في الولايات المتحدة الأمريكية؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "تمثال الحرية", "isCorrect": true },
+                { "text": "الأخدود العظيم (الجراند كنيون)", "isCorrect": true },
+                { "text": "دار أوبرا سيدني", "isCorrect": false },
+                { "text": "برج خليفة", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هي الدولة التي ينتمي إليها معلم 'قصر الحمراء' التاريخي وتشتهر برقصة الفلامنكو؟",
+            "kind": "single",
+            "options": [
+                { "text": "إسبانيا", "isCorrect": true },
+                { "text": "البرتغال", "isCorrect": false },
+                { "text": "إيطاليا", "isCorrect": false },
+                { "text": "المغرب", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في أي دولة يقع 'سور الصين العظيم'؟",
+            "kind": "single",
+            "options": [
+                { "text": "الصين", "isCorrect": true },
+                { "text": "منغوليا", "isCorrect": false },
+                { "text": "فيتنام", "isCorrect": false },
+                { "text": "روسيا", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما هي الدولة التي تشتهر بوجود حيوان الكانغر ودار أوبرا سيدني؟",
+            "kind": "single",
+            "options": [
+                { "text": "أستراليا", "isCorrect": true },
+                { "text": "نيوزيلندا", "isCorrect": false },
+                { "text": "جنوب أفريقيا", "isCorrect": false },
+                { "text": "كندا", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "في أي دولة تقع مدينة 'بتراء' الوردية المنحوتة في الصخر؟",
+            "kind": "single",
+            "options": [
+                { "text": "الأردن", "isCorrect": true },
+                { "text": "السعودية", "isCorrect": false },
+                { "text": "سوريا", "isCorrect": false },
+                { "text": "العراق", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي من الأطعمة والأطباق التالية تُعرف بأصلها من المكسيك؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "التاكو (Tacos)", "isCorrect": true },
+                { "text": "الواكامولي (Guacamole)", "isCorrect": true },
+                { "text": "الكرواسون", "isCorrect": false },
+                { "text": "الباستا", "isCorrect": false }
+            ]
+        }
+    ]
+}
