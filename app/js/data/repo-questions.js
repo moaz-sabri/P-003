@@ -128,6 +128,18 @@ export async function saveQuestion({ id, text, kind, options, groupId = null }) 
                 // never filed should mean. A question written before groups
                 // existed has no `groupId` at all, and is in exactly that state.
                 groupId: groupId ?? row?.groupId ?? null,
+                // `packId` IS PROVENANCE, NOT CONTENT, and the editor cannot change it.
+                //
+                // It is carried on the question record so that "the questions of this
+                // pack are already on this device" is a question the DATABASE can
+                // answer rather than one a second copy of the pack file has to guess at
+                // from the text. Nothing in this file reads it and nothing in the app
+                // draws it; `library-service` reads it when a pack is added a second
+                // time, and that is all. It is preserved here rather than dropped
+                // because the alternative is that editing a question the reader copied
+                // from a library quietly makes the app forget where it came from, which
+                // is what makes a second add copy it all over again.
+                packId: row?.packId ?? null,
                 // A question's place in the list is set when it is created and by
                 // `reorderQuestions` alone. Taking an `order` from a form means a
                 // stale tab could move a question somebody has just reordered.
@@ -172,6 +184,86 @@ export async function saveQuestion({ id, text, kind, options, groupId = null }) 
     });
 
     return result;
+}
+
+/**
+ * Write MANY new questions, and their options, in ONE transaction.
+ *
+ * THIS IS NOT A LOOP AROUND `saveQuestion`, and it is here because importing a ready-made
+ * set is the first thing in this app that creates a known number of questions at once. A
+ * set of twenty questions written through `saveQuestion` is twenty transactions, and each
+ * one re-reads the whole `order` index to find its position — so the write is forty reads
+ * and twenty commits where one of each would do, on the tap a reader is waiting through
+ * after choosing a set. It is also twenty separate moments in time: a sync push fired
+ * halfway through would carry a pack whose first six questions exist and whose shelf does
+ * not.
+ *
+ * CREATE-ONLY, which is why it is a separate function rather than a flag on `saveQuestion`.
+ * Everything `saveQuestion` does that this does not is there for the EDIT path — matching
+ * options by id, tombstoning the ones a form removed, keeping a position the reader has
+ * arranged — and none of it applies to a draft that has never been saved: there are no
+ * stored options to match, nothing to tombstone, and no position to keep. Two functions
+ * with one job each is shorter than one function with a mode, and the edit path's rules
+ * stay where they are read.
+ *
+ * NO VALIDATION. The drafts arrive from `library-service` already through
+ * `domain/pack.js`, which ran `validateQuestion` on each one — the same rule the editor's
+ * form runs. A repository that checked would be a second place the rule lives, which is
+ * the thing `repo-core.js` opens by forbidding.
+ *
+ * `order` CONTINUES THE DEVICE'S LIST and does not restart at zero. A question's place in
+ * the list is its own, device-wide, and a pack's questions are typed after everything
+ * already there rather than in front of it — which is what makes an imported question sit
+ * at the end of the question list, where a reader who has just added it will look.
+ *
+ * @param {{text: string, kind: string, groupId?: string|null,
+ *          packId?: string|null, options: {text: string, isCorrect: boolean}[]}[]} drafts
+ * @returns {Promise<{id: string, index: number}[]>} what was written, in draft order
+ */
+export async function createQuestions(drafts) {
+    const list = drafts ?? [];
+    if (!list.length) return [];
+
+    const device = await currentDeviceId();
+    const at = now();
+    // Read BEFORE the transaction opens, for the same reason `saveQuestion` does: the
+    // position is data the write needs, and reading it inside would be an `await` in the
+    // middle of one.
+    let next = await nextQuestionOrder();
+
+    const written = [];
+    await withTx([STORE.QUESTIONS, STORE.OPTIONS], "readwrite", (tx, db) => {
+        const writes = [];
+        for (const [index, draft] of list.entries()) {
+            const id = newId("question");
+            written.push({ id, index });
+            writes.push(db.put(STORE.QUESTIONS, touch({
+                id,
+                text: draft.text,
+                kind: draft.kind,
+                groupId: draft.groupId ?? null,
+                packId: draft.packId ?? null,
+                order: next++,
+                createdAt: at,
+                deletedAt: null
+            }, device)));
+
+            draft.options.forEach((option, place) => {
+                writes.push(db.put(STORE.OPTIONS, touch({
+                    id: newId("option"),
+                    questionId: id,
+                    text: option.text,
+                    isCorrect: Boolean(option.isCorrect),
+                    order: place,
+                    createdAt: at,
+                    deletedAt: null
+                }, device)));
+            });
+        }
+        return Promise.all(writes);
+    });
+
+    return written;
 }
 
 /**

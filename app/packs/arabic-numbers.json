@@ -1,0 +1,87 @@
+{
+    "name": "الأعداد حتى العشرة",
+    "description": "مطابقة الأعداد بكلماتها، وجمعها، والتمييز بين الزوجي والفردي.",
+    "subject": "اللغة العربية",
+    "questions": [
+        {
+            "text": "ما العدد المقابل لكلمة «سبعة»؟",
+            "kind": "single",
+            "options": [
+                { "text": "7", "isCorrect": true },
+                { "text": "6", "isCorrect": false },
+                { "text": "8", "isCorrect": false },
+                { "text": "9", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما العدد المقابل لكلمة «ثلاثة»؟",
+            "kind": "single",
+            "options": [
+                { "text": "3", "isCorrect": true },
+                { "text": "2", "isCorrect": false },
+                { "text": "4", "isCorrect": false },
+                { "text": "5", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما العدد الذي يلي تسعة؟",
+            "kind": "single",
+            "options": [
+                { "text": "10", "isCorrect": true },
+                { "text": "8", "isCorrect": false },
+                { "text": "11", "isCorrect": false },
+                { "text": "12", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما ناتج جمع ثلاثة وخمسة؟",
+            "kind": "single",
+            "options": [
+                { "text": "8", "isCorrect": true },
+                { "text": "7", "isCorrect": false },
+                { "text": "9", "isCorrect": false },
+                { "text": "6", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "كم عدد أصابع اليد الواحدة؟",
+            "kind": "single",
+            "options": [
+                { "text": "5", "isCorrect": true },
+                { "text": "4", "isCorrect": false },
+                { "text": "6", "isCorrect": false },
+                { "text": "10", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما العدد المقابل لكلمة «عشرون»؟",
+            "kind": "single",
+            "options": [
+                { "text": "20", "isCorrect": true },
+                { "text": "12", "isCorrect": false },
+                { "text": "2", "isCorrect": false },
+                { "text": "22", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي هذه الأعداد زوجي؟",
+            "kind": "single",
+            "options": [
+                { "text": "4", "isCorrect": true },
+                { "text": "7", "isCorrect": false },
+                { "text": "9", "isCorrect": false },
+                { "text": "5", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "كم عدداً في الأعداد من واحد إلى عشرة جميعاً؟",
+            "kind": "single",
+            "options": [
+                { "text": "10", "isCorrect": true },
+                { "text": "9", "isCorrect": false },
+                { "text": "11", "isCorrect": false },
+                { "text": "20", "isCorrect": false }
+            ]
+        }
+    ]
+}

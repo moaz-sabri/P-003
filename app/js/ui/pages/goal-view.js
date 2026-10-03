@@ -47,7 +47,7 @@ import {
 } from "../../services/goal-service.js";
 import * as sessions from "../../services/session-service.js";
 import { go } from "../../app/router.js";
-import { goalActions, contentHref, buildHref, exerciseHref } from "../parts/goal-actions.js";
+import { goalActions, contentHref, buildHref, exerciseHref, libraryHref } from "../parts/goal-actions.js";
 import { setCurrentGoal } from "../nav.js";
 
 /**
@@ -117,6 +117,12 @@ export async function render(ctx) {
         // that are this goal's and not another's.
         h("div", { style: { "margin-top": "var(--space-3)" } },
             link(contentHref(goal.id), t("content.title"), { class: "btn btn-secondary btn-block" })
+        ),
+        // And the ready-made sets, beside it rather than instead of it: a reader who has
+        // forty questions can attach them, and a reader who has none can start from a
+        // set. Both are this same decision, which is why they are on one screen.
+        h("div", { style: { "margin-top": "var(--space-2)" } },
+            link(libraryHref(goal.id), t("library.add_ready"), { class: "btn btn-quiet btn-block" })
         ),
         h("p.tiny.muted", {
             style: { "margin-top": "var(--space-2)" },

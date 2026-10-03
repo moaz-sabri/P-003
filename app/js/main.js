@@ -38,6 +38,7 @@ import { render as archive } from "./ui/pages/archive.js";
 import { render as questions } from "./ui/pages/questions.js";
 import { render as questionEdit } from "./ui/pages/question-edit.js";
 import { render as groups, renderGroup } from "./ui/pages/groups.js";
+import { render as library, renderPack } from "./ui/pages/library.js";
 import { render as exercise } from "./ui/pages/exercise.js";
 import { render as exerciseBuild } from "./ui/pages/exercise-build.js";
 import { render as result } from "./ui/pages/result.js";
@@ -77,6 +78,11 @@ const PAGES = {
     // Same arrangement: the group list, and one group.
     groups,
     "group-view": (ctx) => renderGroup(ctx),
+    // And the same arrangement again: the library of ready-made sets, and one set. A set
+    // has a name and an id rather than an id alone, which is why the second handler is
+    // separate — the list needs no argument and the set needs the id from the path.
+    library,
+    "library-pack": (ctx) => renderPack(ctx),
     // RUNNING an exercise. The id is in the path and is required; there is no
     // handler for a bare `/exercise`, because choosing which goal to act on is a
     // decision the goal page makes from `domain/goal-action.js` and this screen has

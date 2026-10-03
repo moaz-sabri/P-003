@@ -23,6 +23,25 @@ export function head(titleKey, subtitleKey = null, ...actions) {
     );
 }
 
+/**
+ * A title that is a STRING rather than a key.
+ *
+ * The same arrangement as `sectionText` below, for the same reason: `head` takes a key
+ * because every other heading in this app is the app's own words, and a key cannot
+ * interpolate or come from data. The question library's one-set page names its set with
+ * the name in the set's own file — "حروف الهجاء", "English basics" — which is DATA the
+ * reader will recognise and there is no key for. A second variant of `head` is cheaper
+ * than one that accepts both and has to work out which it was given.
+ */
+export function headText(heading, ...actions) {
+    return h("header", { class: "page-head" },
+        h("div.grow", null,
+            h("h1.page-title", { text: heading })
+        ),
+        actions.filter(Boolean).length ? h("div.row", null, actions.filter(Boolean)) : null
+    );
+}
+
 export function card(...children) {
     return h("div.card", null, children);
 }

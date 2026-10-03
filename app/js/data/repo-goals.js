@@ -391,6 +391,67 @@ export async function addGoalRef(goalId, refType, refId) {
     return record;
 }
 
+/**
+ * Point a goal at MANY questions or one group at once.
+ *
+ * `addGoalRef` above is the single-reference write and everything it guarantees holds
+ * here: the id is DERIVED from (goal, refType, refId), so two devices reaching the same
+ * attachment independently produce the same row and the merge keeps one, and attaching
+ * something twice is a no-op rather than a second row.
+ *
+ * IT EXISTS FOR THE ONE CALLER THAT HAS MORE THAN ONE THING TO ATTACH, which is a
+ * question pack. Adding a set of twenty is twenty references, and through the single
+ * write that is twenty transactions each re-reading the goal's whole reference list to
+ * find the next `order` — and twenty moments in time in which a sync push carries half
+ * the set. Here it is one transaction, one read of the table, and positions assigned
+ * from one running maximum.
+ *
+ * THE WHOLE REFERENCE TABLE IS READ ONCE rather than `listRefsTo` per id, because the
+ * idempotence check needs to know what this goal already has and the answer is in the
+ * rows themselves. A device with a few hundred references reads them all in one indexed
+ * sweep, which is cheaper than a hundred transactions and is a single moment — so a
+ * reference cannot be written twice by a merge that arrived halfway through the read.
+ *
+ * @param {string} goalId
+ * @param {string} refType
+ * @param {string[]} refIds
+ * @returns {Promise<object[]>} the rows this call wrote; the ones already there are not in it
+ */
+export async function addGoalRefs(goalId, refType, refIds) {
+    const wanted = [...new Set((refIds ?? []).filter(Boolean))];
+    if (!wanted.length) return [];
+
+    const all = await listAllGoalRefs();
+    const mine = new Set(
+        all.filter((ref) => ref.goalId === goalId && ref.refType === refType).map((ref) => ref.refId)
+    );
+    const rows = all.filter((ref) => ref.goalId === goalId);
+    let order = rows.reduce((max, r) => Math.max(max, r.order + 1), 0);
+
+    const device = await currentDeviceId();
+    const at = now();
+    const written = [];
+
+    await withTx(STORE.GOAL_REFS, "readwrite", (tx, db) => {
+        const writes = wanted.filter((id) => !mine.has(id)).map((refId) => {
+            const record = touch({
+                id: derivedId(GOAL_REF_PREFIX, goalId, refType, refId),
+                goalId,
+                refType,
+                refId,
+                order: order++,
+                createdAt: at,
+                deletedAt: null
+            }, device);
+            written.push(record);
+            return db.put(STORE.GOAL_REFS, record);
+        });
+        return Promise.all(writes);
+    });
+
+    return written;
+}
+
 /** Take a reference away. The question or group it named is NOT touched: a reference
  *  is a relationship, and removing a relationship destroys nothing. */
 export async function removeGoalRef(id) {

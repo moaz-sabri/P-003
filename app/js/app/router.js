@@ -90,6 +90,15 @@ const routes = [
     { name: "question-edit", pattern: /^\/questions\/([^/]+)$/, keys: ["id"] },
     { name: "groups", pattern: /^\/groups$/ },
     { name: "group-view", pattern: /^\/groups\/([^/]+)$/, keys: ["id"] },
+    // The question library: the ready-made sets that ship with the app. The list first
+    // and the literal before the parameterised one, because `match` returns the FIRST
+    // pattern that matches — the rule this file's whole shape rests on.
+    //
+    // `?goal=` is how a set is added to a plan, so the goal travels in the query rather
+    // than the path for the reason `/reports` carries one: this list belongs to no single
+    // goal, and a link from a goal's own page arrives with the choice already made.
+    { name: "library", pattern: /^\/library$/ },
+    { name: "library-pack", pattern: /^\/library\/([^/]+)$/, keys: ["id"] },
     { name: "reports", pattern: /^\/reports$/ },
     { name: "settings", pattern: /^\/settings$/ }
 ];

@@ -82,10 +82,19 @@ export async function render(ctx) {
             selected
                 ? t("questions.group_empty_body", { name: selected.name })
                 : t("questions.empty_body"),
-            link(selected
-                ? `/questions/new?group=${encodeURIComponent(selected.id)}`
-                : "/questions/new",
-            t("questions.add"), { class: "btn" })
+            // TWO WAYS OUT, because "add one" is a request to type and a reader with an
+            // empty list has not necessarily decided to type. The library is the way in
+            // for someone who wants a subject covered rather than one question written,
+            // and it is offered HERE — the page a reader lands on — because the moment a
+            // reader is told they have no questions is the moment that offer is worth
+            // anything.
+            h("div.row", null,
+                link(selected
+                    ? `/questions/new?group=${encodeURIComponent(selected.id)}`
+                    : "/questions/new",
+                t("questions.add"), { class: "btn" }),
+                link("/library", t("library.browse"), { class: "btn btn-secondary" })
+            )
         ));
         return { node };
     }

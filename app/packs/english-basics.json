@@ -1,0 +1,107 @@
+{
+    "name": "English basics",
+    "description": "Everyday English for a beginner: numbers, days, colours, and spelling.",
+    "subject": "English language",
+    "questions": [
+        {
+            "text": "How many days are there in one week?",
+            "kind": "single",
+            "options": [
+                { "text": "Seven", "isCorrect": true },
+                { "text": "Five", "isCorrect": false },
+                { "text": "Six", "isCorrect": false },
+                { "text": "Ten", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which day comes directly after Monday?",
+            "kind": "single",
+            "options": [
+                { "text": "Tuesday", "isCorrect": true },
+                { "text": "Sunday", "isCorrect": false },
+                { "text": "Friday", "isCorrect": false },
+                { "text": "Wednesday", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these is a fruit?",
+            "kind": "multiple",
+            "options": [
+                { "text": "apple", "isCorrect": true },
+                { "text": "banana", "isCorrect": true },
+                { "text": "bread", "isCorrect": false },
+                { "text": "carrot", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which word is the opposite of “big”?",
+            "kind": "single",
+            "options": [
+                { "text": "small", "isCorrect": true },
+                { "text": "long", "isCorrect": false },
+                { "text": "old", "isCorrect": false },
+                { "text": "heavy", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "What is the first month of the year?",
+            "kind": "single",
+            "options": [
+                { "text": "January", "isCorrect": true },
+                { "text": "February", "isCorrect": false },
+                { "text": "March", "isCorrect": false },
+                { "text": "December", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "How many letters does the word “cat” have?",
+            "kind": "single",
+            "options": [
+                { "text": "Three", "isCorrect": true },
+                { "text": "Two", "isCorrect": false },
+                { "text": "Four", "isCorrect": false },
+                { "text": "Five", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these is a colour?",
+            "kind": "multiple",
+            "options": [
+                { "text": "red", "isCorrect": true },
+                { "text": "blue", "isCorrect": true },
+                { "text": "bread", "isCorrect": false },
+                { "text": "tree", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "How many sides has a triangle?",
+            "kind": "single",
+            "options": [
+                { "text": "Three", "isCorrect": true },
+                { "text": "Four", "isCorrect": false },
+                { "text": "Five", "isCorrect": false },
+                { "text": "Two", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which of these words is spelled correctly?",
+            "kind": "single",
+            "options": [
+                { "text": "necessary", "isCorrect": true },
+                { "text": "necessery", "isCorrect": false },
+                { "text": "neccessary", "isCorrect": false },
+                { "text": "necesary", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "Which one do you use to write with?",
+            "kind": "single",
+            "options": [
+                { "text": "a pen", "isCorrect": true },
+                { "text": "a knife", "isCorrect": false },
+                { "text": "a plate", "isCorrect": false },
+                { "text": "a spoon", "isCorrect": false }
+            ]
+        }
+    ]
+}

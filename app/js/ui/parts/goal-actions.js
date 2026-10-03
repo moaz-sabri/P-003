@@ -40,6 +40,28 @@ export const buildHref = (goalId) => `/goal/${encodeURIComponent(goalId)}/exerci
 export const contentHref = (goalId) => `/goal/${encodeURIComponent(goalId)}/content`;
 
 /**
+ * Where the ready-made question sets are, with this goal already chosen.
+ *
+ * IT IS HERE WITH `contentHref` AND `buildHref` rather than in the library page, because
+ * three screens link to it and a link written three times is three URLs to keep in step —
+ * and because the point of the query is the goal, which is this file's subject. The
+ * library reads the id back out of the URL and acts on that plan.
+ *
+ * The query is DROPPED when there is no goal rather than sent empty: `/library?goal=` is a
+ * link that says "with some plan" without saying which, and the page would resolve it to
+ * the newest one — so its meaning would depend on the day it was followed.
+ */
+export const libraryHref = (goalId) => withGoal("/library", goalId);
+
+/** One ready-made set, with the plan still chosen. */
+export const packHref = (packId, goalId) =>
+    withGoal(`/library/${encodeURIComponent(packId)}`, goalId);
+
+function withGoal(path, goalId) {
+    return goalId ? `${path}?goal=${encodeURIComponent(goalId)}` : path;
+}
+
+/**
  * The action block for one goal.
  *
  * @param {{goal: object, action: object, compact?: boolean}} input

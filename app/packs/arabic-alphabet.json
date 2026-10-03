@@ -1,0 +1,105 @@
+{
+    "name": "حروف الهجاء",
+    "description": "أسئلة عن أسماء الحروف العربية وعدد نقاطها، وعن حروف المدّ.",
+    "subject": "اللغة العربية",
+    "questions": [
+        {
+            "text": "ما اسم هذا الحرف: «ا»؟",
+            "kind": "single",
+            "options": [
+                { "text": "ألف", "isCorrect": true },
+                { "text": "باء", "isCorrect": false },
+                { "text": "جيم", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما اسم هذا الحرف: «ب»؟",
+            "kind": "single",
+            "options": [
+                { "text": "ب", "isCorrect": true },
+                { "text": "ت", "isCorrect": false },
+                { "text": "ن", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "كم عدد حروف الهجاء في العربية؟",
+            "kind": "single",
+            "options": [
+                { "text": "28", "isCorrect": true },
+                { "text": "26", "isCorrect": false },
+                { "text": "29", "isCorrect": false },
+                { "text": "36", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي هذه الحروف بلا نقطة؟",
+            "kind": "single",
+            "options": [
+                { "text": "ه", "isCorrect": true },
+                { "text": "ب", "isCorrect": false },
+                { "text": "ج", "isCorrect": false },
+                { "text": "ن", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما اسم هذا الحرف: «ص»؟",
+            "kind": "single",
+            "options": [
+                { "text": "صاد", "isCorrect": true },
+                { "text": "ساء", "isCorrect": false },
+                { "text": "ضاد", "isCorrect": false },
+                { "text": "ظاء", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "أي هذه الحروف من حروف المدّ؟",
+            "kind": "multiple",
+            "options": [
+                { "text": "ا", "isCorrect": true },
+                { "text": "و", "isCorrect": true },
+                { "text": "ي", "isCorrect": true },
+                { "text": "ب", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما آخر حرف في كلمة «كتاب»؟",
+            "kind": "single",
+            "options": [
+                { "text": "ب", "isCorrect": true },
+                { "text": "ت", "isCorrect": false },
+                { "text": "ك", "isCorrect": false },
+                { "text": "ن", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما اسم هذا الحرف: «ع»؟",
+            "kind": "single",
+            "options": [
+                { "text": "عين", "isCorrect": true },
+                { "text": "غين", "isCorrect": false },
+                { "text": "هاء", "isCorrect": false },
+                { "text": "خاء", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "كم عدد نقاط الحرف «ج»؟",
+            "kind": "single",
+            "options": [
+                { "text": "1", "isCorrect": true },
+                { "text": "2", "isCorrect": false },
+                { "text": "3", "isCorrect": false },
+                { "text": "0", "isCorrect": false }
+            ]
+        },
+        {
+            "text": "ما مجموع عدد نقاط الحرفين «ت» و«ب»؟",
+            "kind": "single",
+            "options": [
+                { "text": "3", "isCorrect": true },
+                { "text": "2", "isCorrect": false },
+                { "text": "4", "isCorrect": false },
+                { "text": "1", "isCorrect": false }
+            ]
+        }
+    ]
+}

@@ -39,6 +39,7 @@ import * as groups from "../../services/group-service.js";
 import * as questions from "../../services/question-service.js";
 import { go } from "../../app/router.js";
 import { setCurrentGoal } from "../nav.js";
+import { libraryHref } from "../parts/goal-actions.js";
 
 export async function render(ctx) {
     const goalId = ctx?.route?.params?.id ?? ctx?.query?.get("goal") ?? null;
@@ -88,7 +89,17 @@ export async function render(ctx) {
     });
 
     const node = h("div.stack", null);
+    // THE LIBRARY IS A THIRD WAY IN, beside attaching a shelf and ticking questions, and
+    // it is in the header rather than at the bottom of the list for the reason it matters:
+    // it is the only one of the three a reader may never have heard of. It is also the
+    // only one that is about MATERIAL RATHER THAN ATTACHMENT — everything else on this
+    // screen takes questions the device already has — so burying it under two hundred
+    // checkboxes would be a way of not offering it.
+    //
+    // The goal is in the link, so arriving here from the library comes back to this goal
+    // with this goal chosen.
     node.appendChild(head("content.title", "content.subtitle",
+        link(libraryHref(goal.id), t("library.title"), { class: "btn btn-secondary" }),
         link(`/goal/${encodeURIComponent(goal.id)}`, t("common.back"), { class: "btn btn-quiet" })
     ));
 
