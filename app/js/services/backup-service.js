@@ -27,7 +27,7 @@
 
 import { withTx } from "../data/db.js";
 import { SYNCED_STORES, STORE } from "../data/stores.js";
-import { currentDeviceId } from "../data/repos.js";
+import { currentDeviceId } from "../data/repo-core.js";
 import { seal, unseal } from "./crypto-service.js";
 import { getIdentity } from "./identity-service.js";
 import { downloadFile, markBackup } from "./export-service.js";
@@ -226,12 +226,22 @@ export async function readBackupFile(file) {
 }
 
 /** The record kinds in a backup, in the order a person would say them. Used to
- *  label the confirm dialog without hard-coding store names in the UI. */
+ *  label the confirm dialog without hard-coding store names in the UI.
+ *
+ *  `goalRefs` is "attachment" rather than "reference" because that is the word the
+ *  goal's content page uses for the rows, and a restore dialog is read by the same
+ *  person who just tapped "attach". Every store in `SYNCED_STORES` appears here: a
+ *  missing entry renders as an empty count, which reads as "this backup has none of
+ *  these" rather than "this app forgot about these", and it is the `goalRefs` row
+ *  that would go unmentioned — the one kind that is new and easy to leave out of a
+ *  list copied from before it existed. */
 export const BACKUP_STORE_LABELS = {
     [STORE.GOALS]: "goal",
     [STORE.QUESTIONS]: "question",
+    [STORE.GROUPS]: "group",
     [STORE.OPTIONS]: "option",
     [STORE.EXERCISES]: "exercise",
     [STORE.EXERCISE_ITEMS]: "item",
-    [STORE.ATTEMPTS]: "answer"
+    [STORE.ATTEMPTS]: "answer",
+    [STORE.GOAL_REFS]: "attachment"
 };

@@ -121,6 +121,7 @@ const DYNAMIC_RULES = [
 const used = new Map();      // key -> first place it was named
 const usedVia = new Map();   // key -> Set of call shapes
 const params = [];           // {key, named, where}
+const bare = [];             // {key, where} — t("key") with no params object
 const dynamic = new Map();   // prefix -> count
 const codes = new Map();     // error code -> first place it was produced
 
@@ -155,6 +156,17 @@ for (const path of walk(APP_JS)) {
     for (const match of text.matchAll(/\bt\(\s*"([a-z][\w]*(?:\.[\w]+)+)"\s*,\s*\{([^{}]*)\}/g)) {
         const named = [...match[2].matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:[:,},]|$)/g)].map((m) => m[1]);
         params.push({ key: match[1], named, where: `${name}:${lineAt(text, match.index)}` });
+    }
+
+    // `t("key")` WITH NO PARAGRAPH OBJECT, for a string that interpolates something.
+    // The check above only sees a call that PASSES a params object, so this one is
+    // the other half of it — and the half that was missing: `t("home.continue_exercise")`
+    // on a string written `{n} of …` renders `Continue exercise {n}` on screen, in both
+    // languages, and the report was silent because a bare `t()` matches no pattern the
+    // placeholder comparison looks at. A placeholder that is never filled is not a
+    // missing translation; it is a bug that renders.
+    for (const match of text.matchAll(/\bt\(\s*(["'`])([a-z][\w]*(?:\.[\w]+)+)\1\s*[,)]/g)) {
+        bare.push({ key: match[2], where: `${name}:${lineAt(text, match.index)}` });
     }
 
     for (const rule of DYNAMIC_RULES) {
@@ -286,6 +298,18 @@ for (const { key, named, where } of params) {
         if (!named.includes(name)) {
             fail(where, `\`${key}\` interpolates {${name}} and this call passes {${named.join(", ") || "nothing"}}`);
         }
+    }
+}
+
+// A KEY WITH PLACEHOLDERS CALLED WITHOUT PARAMS renders the braces. The `params`
+// loop above cannot see this case — it only matches a call that passes an object —
+// so a `t("…")` with no second argument is checked here against the string it
+// names. It is the check that catches `Continue exercise {n}` on a screen.
+const filled = new Set(params.map((p) => p.key));
+for (const { key, where } of bare) {
+    if (filled.has(key)) continue;
+    for (const name of placeholders(base[key] ?? "")) {
+        fail(where, `\`${key}\` interpolates {${name}} and this call passes nothing`);
     }
 }
 

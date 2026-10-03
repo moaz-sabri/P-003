@@ -18,7 +18,7 @@
 // from when they have three of them.
 
 import { SECRET_KEY_LENGTH, formatSecretKey, normalizeSecretKey } from "../domain/secret-key.js";
-import { setMeta, getMeta } from "../data/repos.js";
+import { setMeta, getMeta } from "../data/repo-core.js";
 import { META_KEY } from "../data/stores.js";
 import { now, wholeDaysBetween } from "../domain/time.js";
 import { BACKUP_REMINDER_DAYS } from "../config.js";

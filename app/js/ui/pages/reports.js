@@ -16,6 +16,8 @@ import { h, link, statRow, stat, emptyState } from "../dom.js";
 import { head, section, sectionText, card } from "../page.js";
 import { t, formatPercent, formatDate } from "../../i18n/i18n.js";
 import { build, ACTIVITY_DAYS } from "../../services/report-service.js";
+import { listActiveGoals } from "../../services/goal-service.js";
+import { setCurrentGoal } from "../nav.js";
 
 /**
  * A `dayKey` as a local timestamp.
@@ -31,8 +33,9 @@ function localDay(key) {
     return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
 }
 
-export async function render() {
-    const data = await build();
+export async function render(ctx) {
+    const goalId = ctx?.query?.get("goal") ?? null;
+    const data = await build(goalId);
     if (!data) {
         return {
             node: h("div.stack", null,
@@ -46,8 +49,24 @@ export async function render() {
         };
     }
 
+    // How many goals are live, so the page knows whether naming one is necessary.
+    // Read here rather than passed in because `build` already read the goal and
+    // asking it again for a boolean would be a second transaction for one `if`.
+    const active = await listActiveGoals();
+    const data_ = { ...data, goals: active };
+
+    setCurrentGoal(data.goal.id);
+
     const node = h("div.stack", null);
     node.appendChild(head("reports.title", "reports.subtitle"));
+
+    // WHICH GOAL THIS IS ABOUT, said out loud. With one goal the heading is enough;
+    // with three, "Accuracy 81%" on a page that does not say which subject it
+    // belongs to is a number the reader has to guess about, and the reports are the
+    // page they are most likely to compare between goals.
+    if (data_.goals.length > 1) {
+        node.appendChild(card(h("p.small.muted", { text: t("reports.for_goal", { title: data.goal.title }) })));
+    }
 
     node.appendChild(card(statRow(
         stat(formatPercent(data.accuracy.percent), t("reports.stat_accuracy")),
@@ -60,7 +79,7 @@ export async function render() {
         t("reports.activity_heading", { days: ACTIVITY_DAYS }),
         activityCard(data)
     ));
-    node.appendChild(section("reports.weak_heading", weakList(data.weak)));
+    node.appendChild(section("reports.weak_heading", weakList(data.weak, data.goal.id)));
 
     return { node };
 }
@@ -122,7 +141,7 @@ function activityCard(data) {
 
 /* ------------------------------- needs work -------------------------------- */
 
-function weakList(rows) {
+function weakList(rows, goalId) {
     if (!rows.length) {
         return card(h("p.muted", { text: t("reports.weak_empty") }));
     }
@@ -140,7 +159,13 @@ function weakList(rows) {
         list.appendChild(h("div.card.card-quiet.row-between", {
             style: { "border-inline-start": "4px solid var(--bad-soft)", gap: "var(--space-3)" }
         },
-        h("span.grow", null, link(`/questions/${row.questionId}`, row.text || t("error.not_found"))),
+        // The goal is in the link. This page knows which goal it is reporting on,
+        // and a weak-question link without it opens the editor against whichever goal
+        // happens to be newest — where saving would FILE this question.
+        h("span.grow", null, link(
+            `/questions/${encodeURIComponent(row.questionId)}?goal=${encodeURIComponent(goalId)}`,
+            row.text || t("error.not_found")
+        )),
         h("span.small.muted.nums", {
             text: t("reports.weak_score", { correct: row.correct, total: row.total })
         })

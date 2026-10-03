@@ -35,7 +35,7 @@ import { seal, unseal, authKeyHex } from "./crypto-service.js";
 import { getIdentity } from "./identity-service.js";
 import { setState } from "../app/bus.js";
 import { META_KEY, SYNCED_STORES } from "../data/stores.js";
-import { listDirty, markPushed, applyRemote, getMeta, setMeta } from "../data/repos.js";
+import { listDirty, markPushed, applyRemote, getMeta, setMeta } from "../data/repo-core.js";
 import { SYNC_PUSH_BATCH, SYNC_PULL_LOOP_MAX } from "../config.js";
 import { SyncError } from "../domain/errors.js";
 import { isId } from "../domain/id.js";
@@ -127,9 +127,15 @@ async function writeCursor(rev) {
 }
 
 /** How many records are waiting to go out, for the settings page and the home
- *  screen. Counts all six stores rather than the one the next push would read,
- *  because "4 waiting" must not turn into "0 waiting" while three stores' worth
- *  is still unsent because the push loop stopped at the batch boundary. */
+ *  screen. Counts ALL the synced stores rather than the one the next push would read,
+ *  because "4 waiting" must not turn into "0 waiting" while three stores' worth is
+ *  still unsent because the push loop stopped at the batch boundary.
+ *
+ *  The list is `SYNCED_STORES` rather than a number, so it was seven stores before the
+ *  separation and is eight now without anything here having to change — which is the
+ *  property worth having here, because a hard-coded count would have gone stale the
+ *  moment `goalRefs` was added and would have been wrong by one store's worth of
+ *  pending records, silently. */
 export async function pendingCount() {
     let total = 0;
     for (const store of SYNCED_STORES) {

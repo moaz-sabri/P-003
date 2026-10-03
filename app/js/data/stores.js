@@ -16,15 +16,27 @@
 export const STORE = {
     GOALS: "goals",
     QUESTIONS: "questions",
+    GROUPS: "groups",
     OPTIONS: "options",
     EXERCISES: "exercises",
     EXERCISE_ITEMS: "exerciseItems",
     ATTEMPTS: "attempts",
+    GOAL_REFS: "goalRefs",
     META: "meta",
     KEYS: "keys"
 };
 
-/** Every store name, in the order a schema is created. */
+/**
+ * Every store name, in the order a schema is created.
+ *
+ * `groups` AND `goalRefs` ARE LAST, and that is not tidiness — it is what happens.
+ * `groups` was added by migration 2 and `goalRefs` by migration 5, and a store
+ * created by a later migration is created after every store an earlier one made.
+ * Putting them next to the stores they relate to, where they read better, would make
+ * this list a description of how the schema *ought* to be rather than of what the
+ * browser builds, and this list is compared against that in tests/data.test.mjs
+ * precisely so the two cannot disagree.
+ */
 export const ALL_STORES = [
     STORE.GOALS,
     STORE.QUESTIONS,
@@ -33,17 +45,21 @@ export const ALL_STORES = [
     STORE.EXERCISE_ITEMS,
     STORE.ATTEMPTS,
     STORE.META,
-    STORE.KEYS
+    STORE.KEYS,
+    STORE.GROUPS,
+    STORE.GOAL_REFS
 ];
 
 /** The stores whose records travel to the API, and nothing else. */
 export const SYNCED_STORES = [
     STORE.GOALS,
     STORE.QUESTIONS,
+    STORE.GROUPS,
     STORE.OPTIONS,
     STORE.EXERCISES,
     STORE.EXERCISE_ITEMS,
-    STORE.ATTEMPTS
+    STORE.ATTEMPTS,
+    STORE.GOAL_REFS
 ];
 
 const SYNCED = new Set(SYNCED_STORES);
@@ -56,7 +72,23 @@ const SYNCED = new Set(SYNCED_STORES);
  */
 export const QUERIES = {
     activeGoal: { store: STORE.GOALS, index: "status", value: "active" },
-    goalQuestions: { store: STORE.QUESTIONS, index: "goalId" },
+    archivedGoals: { store: STORE.GOALS, index: "archivedAt" },
+    recentExercises: { store: STORE.EXERCISES, index: "createdAt" },
+    /** "Which exercises contain this question" — the reverse of `exerciseItems`, and
+     *  the read that makes a question independent of any one of them answerable. */
+    exercisesOfQuestion: { store: STORE.EXERCISE_ITEMS, index: "questionId" },
+    /** A goal's references, in the order the reader added them. This is the read that
+     *  replaced "questions with this `goalId`", and it is the ONLY thing that says a
+     *  goal and a question are related now. */
+    goalRefs: { store: STORE.GOAL_REFS, index: "goalOrder", keyPath: ["goalId", "order"] },
+    /** The other direction: which goals point at this group or this question. The
+     *  group page needs it to say "used by two goals" without reading every goal on
+     *  the device, and it is what makes a group deletable-with-a-warning rather than
+     *  silently pulling material out of a second goal. */
+    refsOf: { store: STORE.GOAL_REFS, index: "ref", keyPath: ["refType", "refId"] },
+    allQuestions: { store: STORE.QUESTIONS, index: "order" },
+    allGroups: { store: STORE.GROUPS, index: "order" },
+    groupQuestions: { store: STORE.QUESTIONS, index: "groupId" },
     questionOptions: { store: STORE.OPTIONS, index: "questionId" },
     goalExercises: { store: STORE.EXERCISES, index: "goalId" },
     exerciseItems: { store: STORE.EXERCISE_ITEMS, index: "exerciseId" },

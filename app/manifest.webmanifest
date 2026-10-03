@@ -49,7 +49,7 @@
             "name": "Add a question",
             "short_name": "Add",
             "url": "/questions/new",
-            "description": "Write one question for the active goal"
+            "description": "Write one question. It needs no goal, and attaches to one later"
         }
     ]
 }

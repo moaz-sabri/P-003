@@ -1,218 +1,210 @@
-// The home page: what is due, and how far along it is.
+// The home page: the goals, the exercises that are open on them, and enough numbers
+// to tell whether any of it is working.
 //
-// It answers four questions in this order, because that is the order they are
-// asked in: is there anything to do right now; how far along is the goal; what is
-// the progress; how have I been doing. Everything else about a goal is on its own
-// page.
+// WHAT IS ON IT, and what is deliberately not:
 //
-// The first is the only one that has to be exactly right. "Start exercise" is a
-// button that reads a whole goal's exercises and decides whether it may be
-// pressed — and the exercise it leads to is built from the same schedule, so there
-// is no path where the page says yes and the builder says no.
+//   FOR EACH GOAL
+//     the goal's name and what can be done about it, from one decision
+//     its OPEN exercises, each with a resume button
+//     the tracking figures: how many questions it draws on, how many are learned,
+//         how many exercises are done, and the accuracy
+//     its CATEGORIES -- the shelves it is pointed at, by name and size
+//
+// NOT ON IT
+//     the plan's four numbers. They are editable, they are not what a reader is
+//     checking when they open the app, and they were here because the home page was
+//     once the goal page. They are on the goal's page.
+//     the "choose what to be asked" button. That is a decision, and the home page is
+//     a place to find out what is due rather than a place to make one.
+//
+// It answers four questions, in this order because that is the order they are asked
+// in: is there anything to do right now; how far along is the goal; what is the
+// progress; how have I been doing.
+//
+// THE PAGE IS A LIST OF GOALS, which is the visible consequence of letting a reader
+// have more than one. It used to draw "the" goal — `getActiveGoal()`, which silently
+// took the newest — and with three goals that is a screen that answers a question
+// about French on the day the reader came to revise Arabic. Each goal gets its own
+// card, its own state and its own buttons, and the page says which is which.
+//
+// THE FIRST QUESTION IS THE ONLY ONE THAT HAS TO BE EXACTLY RIGHT. "Start exercise"
+// reads a whole goal's schedule and decides whether it may be pressed, and the
+// exercise it leads to is built from that same schedule, so there is no path where the
+// page says yes and the builder says no. The decision itself is `domain/goal-action.js`
+// and the numbers behind it are `goal-service.overviews()`, so the goal page draws the
+// same answer from the same read.
 
-import { h, meter, statRow, stat, link, emptyState } from "../dom.js";
-import { head, section, card } from "../page.js";
-import * as toast from "../toast.js";
+import { h, link, meter, statRow, stat, emptyState } from "../dom.js";
+import { head, card } from "../page.js";
 import { t, formatPercent, formatCountdown } from "../../i18n/i18n.js";
-import { snapshot, SCHEDULE } from "../../services/goal-service.js";
-import { progressFor } from "../../services/report-service.js";
-import { go } from "../../app/router.js";
-import { remaining } from "../../domain/time.js";
+import { overviews, goalAction } from "../../services/goal-service.js";
+import { goalActions, contentHref } from "../parts/goal-actions.js";
+import { setCurrentGoal } from "../nav.js";
 
 export async function render() {
-    const { goal, exercises, questions, plan } = await snapshot();
+    const rows = await overviews();
+    if (!rows.length) return { node: noGoal() };
 
-    if (!goal) return { node: noGoal() };
-    if (goal.status === "completed") return { node: finishedGoal(goal) };
-    if (plan.state === SCHEDULE.EXPIRED) return { node: expiredGoal(goal) };
+    // The goal the nav bar will carry from here. The FIRST card is not arbitrary:
+    // `overviews()` comes back newest-first, and the newest goal is the one a reader
+    // who just created something wants the nav bar pointing at.
+    setCurrentGoal(rows[0]?.goal?.id ?? null);
 
     const node = h("div.stack", null);
     node.appendChild(head(
         "home.next_exercise_heading",
-        goal.title,
-        link("/goal", t("goal.title_view"), { class: "btn btn-quiet" })
+        null,
+        link("/goal", t("nav.goal"), { class: "btn btn-quiet" })
     ));
 
-    const summary = await progressFor(goal);
-    const exercise = exerciseCard(plan, questions.length);
-    node.appendChild(exercise.node);
-
-    node.appendChild(section("home.progress_heading", progressCard(summary, questions.length, plan)));
-
-    const completed = exercises.filter((e) => e.completedAt).length;
-    const accuracyPercent = String(summary.accuracy.percent);
-    // A labelled sentence, not "51 of 54".
-    //
-    // That line used to borrow the reports page's bare `weak_score` string, which on
-    // its own page sits under a heading that says what the numbers are and here
-    // sits under nothing at all: two figures with no noun on the home page of an
-    // app whose whole point is being legible at a glance. The sentence says what was
-    // answered and how many were right, and the reports page is one tap away for
-    // the per-question list.
-    const answersLine = h("p.small.muted", {
-        style: { "margin-top": "var(--space-3)" },
-        text: t("home.answers_line", {
-            correct: summary.accuracy.correct,
-            total: summary.accuracy.total
-        })
-    });
-    const progressStats = statRow(
-        stat(questions.length, t("home.stat_questions")),
-        stat(summary.progress.learned, t("home.stat_learned")),
-        stat(completed, t("home.stat_exercises")),
-        stat(accuracyPercent, t("home.stat_accuracy"))
-    );
-    node.appendChild(card(progressStats, answersLine));
-
-    return { node, destroy: exercise.destroy };
-}
-
-/* ------------------------------ the button ------------------------------- */
-
-function exerciseCard(plan, questionCount) {
-    const body = h("div.stack-tight");
-    let destroy = null;
-
-    if (plan.state === SCHEDULE.IN_PROGRESS && plan.exercise) {
-        const openId = plan.exercise.id;
-        body.appendChild(h("p.muted", { text: t("home.open_exercise_body") }));
-        body.appendChild(h("button.btn.btn-block", {
-            type: "button",
-            onclick: () => go(`/exercise?id=${encodeURIComponent(openId)}`)
-        }, t("home.continue_exercise")));
-    } else if (plan.state === SCHEDULE.WAITING) {
-        // A live number, so a node that is updated rather than a string computed
-        // once. Painted once and left alone it reads "opens in 1 day" for a whole
-        // day, which is the fastest way to make a reader think the app has
-        // stopped counting. Every thirty seconds, not every second: nothing on
-        // this page is worth waking a phone for more often, and a countdown that
-        // visibly ticks down every second invites taps on a button that is
-        // disabled anyway.
-        const countdown = h("span.nums");
-        const paint = () => { countdown.textContent = formatCountdown(remaining(plan.dueAt)); };
-        paint();
-        const timer = setInterval(paint, 30_000);
-        destroy = () => clearInterval(timer);
-
-        // The countdown is a NODE. The sentence has no `{time}` and no trailing
-        // full stop for the same reason the result page's does not: the value used
-        // to be interpolated as an empty placeholder and the period that followed
-        // it was left stranded in front of a number that arrived after it, which
-        // printed "opens in . 23h 59m" on the one screen whose whole job is to say
-        // when the reader may come back.
-        body.appendChild(h("p", null, t("home.locked_body"), " ", countdown));
-        body.appendChild(h("button.btn.btn-block", {
-            type: "button",
-            disabled: true,
-            "aria-disabled": "true"
-        }, t("home.locked_heading")));
-    } else if (questionCount === 0) {
-        body.appendChild(h("p.muted", { text: t("home.needs_questions_body") }));
-        body.appendChild(link("/questions", t("home.add_questions"), { class: "btn btn-block" }));
-    } else {
-        body.appendChild(h("button.btn.btn-block", {
-            type: "button",
-            onclick: startExercise
-        }, t("home.start_exercise")));
+    const destroyers = [];
+    for (const row of rows) {
+        const drawn = await goalCard(row);
+        if (drawn?.destroy) destroyers.push(drawn.destroy);
+        node.appendChild(drawn.node);
     }
 
-    return { node: card(body), destroy };
-}
-
-async function startExercise(event) {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-        const { start } = await import("../../services/exercise-service.js");
-        const { exercise } = await start();
-        go(`/exercise?id=${encodeURIComponent(exercise.id)}`);
-    } catch (err) {
-        button.disabled = false;
-        toast.error(err);
-        // A refusal from the schedule means this page was out of date. The honest
-        // repair is to re-draw, not to explain the rule.
-        if (err?.code === "invalid_transition" || err?.code === "too_soon") {
-            go("/");
+    return {
+        node,
+        destroy() {
+            for (const fn of destroyers) fn();
         }
-    }
+    };
 }
 
-/* -------------------------------- progress ------------------------------- */
+/* ------------------------------ one goal ---------------------------------- */
 
-function progressCard(summary, questionCount, plan) {
-    const p = summary.progress;
+/**
+ * One goal's whole card: its state, what can be done about it, and how far along it
+ * is.
+ *
+ * THE STATE LINE IS BUILT FROM ONE DECISION AND TWO NUMBERS, and they are different
+ * questions. `goalAction` says what may be done; the schedule asked whether this
+ * goal's own interval has elapsed while the quota asked whether the reader has
+ * started too many exercises anywhere on this device recently. A reader over the rate
+ * is refused by every goal at once, so a card that only showed its own schedule would
+ * say "ready" on a page where every Start button is dead — and the button being dead
+ * with no explanation is the bug this split exists to prevent.
+ *
+ * `compact` is set on the action block: the home page offers a Start and a resume,
+ * and the "choose what to be asked" button belongs on the goal's own page, which is
+ * where a reader goes when they already know what they want.
+ */
+async function goalCard(row) {
+    const { goal, plan, quota, exercises, material, stats, open } = row;
+    const action = goalAction({ plan, materialCount: material.count, open, quota });
+    const drawn = goalActions({ goal, action, compact: true });
+
+    const body = h("div.stack-tight");
+    body.appendChild(h("div.row-between", null,
+        h("h2", { style: { "margin": "0" }, text: goal.title }),
+        link(`/goal/${encodeURIComponent(goal.id)}`, t("goal.open_button"), { class: "btn btn-quiet" })
+    ));
+
+    if (goal.description) {
+        body.appendChild(h("p.small.muted", { text: goal.description }));
+    }
+
+    const controls = h("div", null);
+    controls.appendChild(drawn.node);
+    body.appendChild(controls);
+
+    // THE CATEGORIES. The shelves this goal draws on, by name and size, and the
+    // questions attached one at a time.
+    //
+    // It is here rather than only on the goal's page because the reader's question on
+    // the home page is "is this the material I think it is?" — and "42 questions" does
+    // not answer that, whereas "Chapter 3 · 18, Irregular verbs · 12, plus 12 picked
+    // one by one" does. It is also the one row of the card that can be acted on from
+    // here, which is why the whole line is a link to the attachment screen.
+    if (material.count) {
+        body.appendChild(h("div", { style: { "margin-top": "var(--space-3)" } },
+            link(contentHref(goal.id), categoriesLine(material), { class: "chips" })
+        ));
+    }
+
+    // Progress. Read through the same `summarize` the reports page makes, so the two
+    // can never disagree about how much is learned.
+    const p = stats.progress;
     const endsAt = plan?.endsAt;
-    return card(
+
+    body.appendChild(h("div", { style: { "margin-top": "var(--space-3)" } },
         meter(p.percent),
         h("div.row-between", { style: { "margin-top": "var(--space-2)" } },
-            h("span.small.muted", { text: `${p.learned} / ${questionCount}` }),
+            h("span.small.muted", { text: `${p.learned} / ${material.count}` }),
             h("span.small.nums", { text: formatPercent(p.percent) })
         ),
-        // "How long is left" is one of the few things a goal page owes the reader:
-        // without it there is no way to tell a slow week from a nearly finished
-        // plan, and the percentage alone answers neither.
         endsAt
             ? h("p.small.muted", {
                 style: { "margin-top": "var(--space-2)" },
                 text: t("home.ends_in", { time: formatCountdown(endsAt - Date.now()) })
             })
             : null
+    ));
+
+    body.appendChild(h("div", { style: { "margin-top": "var(--space-3)" } },
+        statRow(
+            stat(material.count, t("home.stat_questions")),
+            stat(p.learned, t("home.stat_learned")),
+            stat(row.exercisesCount.completed, t("home.stat_exercises")),
+            stat(String(stats.accuracy.percent), t("home.stat_accuracy"))
+        )
+    ));
+
+    body.appendChild(h("p.small.muted", {
+        style: { "margin-top": "var(--space-3)" },
+        text: t("home.answers_line", {
+            correct: stats.accuracy.correct,
+            total: stats.accuracy.total
+        })
+    }));
+
+    // THE OPEN EXERCISES AS ROWS, not only as buttons.
+    //
+    // The action block above already offers a resume button per open exercise, and
+    // this line says how many are sitting there and when the oldest was started. A
+    // reader with two exercises open needs to know which one has been sitting for a
+    // fortnight, because that is the one they have either forgotten about or given up
+    // on -- and a button labelled "Continue exercise 3" does not tell them that.
+    if (open.length > 1) {
+        body.appendChild(h("p.small.muted", {
+            style: { "margin-top": "var(--space-3)" },
+            text: t("home.open_exercises_line", { n: String(open.length) })
+        }));
+    }
+
+    return { node: card(body), destroy: drawn.destroy };
+}
+
+/**
+ * The category line: the shelves, then the loose questions.
+ *
+ * A NODE LIST rather than one string, and the reasons are the same as the group chips
+ * on the question list: a shelf name is reader-supplied text of unbounded length, and
+ * joining three of them with a middot into one string is a line that wraps to three
+ * lines on a phone and reads as a sentence about nothing. Each shelf is its own chip
+ * with its size, which is also what makes the sizes comparable at a glance.
+ */
+function categoriesLine(material) {
+    const chips = material.groups.map((group) =>
+        h("span.chip", { text: `${group.name} · ${group.size}` })
     );
+    if (material.loose) {
+        chips.push(h("span.chip", { text: t("home.loose_chip", { n: String(material.loose) }) }));
+    }
+    return h("div.row", { style: { "flex-wrap": "wrap", gap: "var(--space-1)" } }, ...chips);
 }
 
 /* ------------------------------- no goal --------------------------------- */
 
 function noGoal() {
+    setCurrentGoal(null);
     return h("div.stack", null,
         head("home.no_goal_heading", null),
         emptyState(
             t("home.no_goal_heading"),
             t("home.no_goal_body"),
             link("/goal", t("home.create_goal"), { class: "btn" })
-        )
-    );
-}
-
-/* ---------------------------- finished goal ------------------------------ */
-
-function finishedGoal(goal) {
-    return h("div.stack", null,
-        head("goal.finished_heading", goal.title),
-        card(
-            h("p", { text: t("goal.finished_body") }),
-            h("div.btn-row", null,
-                link("/reports", t("result.reports_button"), { class: "btn btn-secondary" }),
-                link("/goal", t("home.create_goal"), { class: "btn" })
-            )
-        )
-    );
-}
-
-/* ------------------------------ expired goal ------------------------------ */
-
-/**
- * The plan's time is up, and nothing has been deleted.
- *
- * This is a state, not an ending. The questions are all still there, the reports
- * still answer, and the one thing the page will not do is build another exercise
- * — because the reader set a length when they created the goal and quietly
- * ignoring it is how a plan turns into an open-ended habit nobody chose.
- *
- * The two buttons are the two real choices and both are offered: close it and
- * start the next one, or look at how it went. An expired goal that only offered
- * "start a new one" would be telling the reader their work is over, which is not
- * what a date is.
- */
-function expiredGoal(goal) {
-    return h("div.stack", null,
-        head("goal.expired_heading", goal.title),
-        card(
-            h("p", { text: t("goal.expired_body") }),
-            h("div.stack-tight", null,
-                link("/reports", t("result.reports_button"), { class: "btn btn-secondary btn-block" }),
-                link("/questions", t("nav.questions"), { class: "btn btn-secondary btn-block" }),
-                link("/goal", t("goal.expired_close"), { class: "btn btn-block" })
-            )
         )
     );
 }

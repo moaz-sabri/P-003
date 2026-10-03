@@ -12,7 +12,7 @@
 
 import { TABLES, LANGUAGES, DEFAULT_LANGUAGE } from "./strings.js";
 import { META_KEY } from "../data/stores.js";
-import { getMeta, setMeta } from "../data/repos.js";
+import { getMeta, setMeta } from "../data/repo-core.js";
 import { countdownParts, COUNTDOWN_UNITS, formatStopwatch } from "../domain/time.js";
 
 let language = DEFAULT_LANGUAGE;

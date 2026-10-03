@@ -12,6 +12,28 @@
     box-sizing: border-box;
 }
 
+/* `hidden` HAS TO WIN AGAINST THE CLASSES, and it does not on its own.
+ *
+ * The user-agent rule is `[hidden] { display: none }`, and an author rule of ANY
+ * specificity beats it — origin is compared before specificity — so the moment a
+ * component gives an element a class that sets `display` (`.btn` is
+ * `inline-flex`, `.row` is `flex`, `.card` is `block`) the `hidden` attribute stops
+ * hiding it. Every `hidden: true` in this app is a control that is deliberately not
+ * offered: the button that removes an option when there are only two, the button
+ * that adds one when there are already six, a field error before it has an error.
+ * With this rule missing, all three are drawn, all three are tappable, and the two
+ * buttons below the minimum option count were found by removing options one at a
+ * time until the validator refused — a rule the reader can only learn by breaking it.
+ *
+ * `!important` rather than a more specific selector, because "one more class on the
+ * selector" is a fix that has to be applied again to every component added later,
+ * and the rule being defended here is a property of HTML rather than of this
+ * stylesheet.
+ */
+[hidden] {
+    display: none !important;
+}
+
 html {
     -webkit-text-size-adjust: 100%;
 }

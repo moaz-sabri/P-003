@@ -10,9 +10,10 @@
         "build:assets": "webpack --mode production",
         "build": "npm run build:assets",
         "dev": "npm run build:assets && php -S 127.0.0.1:8080 -t app docker-router.php",
-        "test": "npm run test:client && npm run check:i18n && npm run test:api",
+        "test": "npm run test:client && npm run check:i18n && npm run check:imports && npm run test:api",
         "test:client": "node --test tests/*.test.mjs",
         "check:i18n": "node tools/check-i18n.mjs",
+        "check:imports": "node tools/check-imports.mjs",
         "test:api": "php api/tests/run.php",
         "icons": "node tools/make-icons.mjs"
     },

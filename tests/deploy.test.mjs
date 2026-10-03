@@ -17,6 +17,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { APP_VERSION } from "../app/js/config.js";
+// The router itself, not a copy of its table. `match` is a pure string match with no
+// DOM in it, so the page-routing tests below can ask the real thing what it serves —
+// which is the only way a test about the router can catch a change in the router.
+import { match } from "../app/js/app/router.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const pkg = JSON.parse(read("../package.json"));
@@ -312,6 +316,193 @@ test("the webpack output path is the one the servers serve", () => {
     // there is no second shell file for a server to pick the wrong one of.
     assert.match(webpack, /template: "\.\/app\/index\.html"/);
     assert.match(webpack, /filename: "index\.html"/);
+});
+
+/* -------------------------------------------------------------------------- */
+/*                                  the routes                                  */
+/* -------------------------------------------------------------------------- */
+
+// The failure this catches is one that never appears in a stack trace.
+//
+// app/router.js holds the paths and app/main.js holds the page behind each one, and
+// neither can read the other: the router matches strings and knows nothing about
+// modules, while main.js holds the imports that must not be in the router's chunk.
+// A route with no page renders as `undefined`, the router calls it, and `replace()`
+// catches the TypeError and paints an empty fragment — a blank screen with a console
+// message, on one URL, with every other page working.
+//
+// It happened here for real. `/groups/:id` was imported as
+// `import { render as groupView }` when the module exports it as `renderGroup`, so
+// the single-group page — where the "exercise this group" button lives — was an
+// undefined handler and the whole route drew nothing. Nothing failed: the bundle
+// built, the other thirteen routes worked, and the route was simply blank.
+
+const routerSrc = read("../app/js/app/router.js");
+const mainSrc = read("../app/js/main.js");
+
+/** Route names, as the router declares them, paired with whether they draw a page.
+ *
+ *  A ROUTE WITH A `redirect` HAS NO PAGE, and must not be expected to have one. The
+ *  three legacy shapes (`/exercise`, `/exercise/build`, `/exercise/result`) are in the
+ *  table purely so an old bookmark or a cached link is answered rather than 404'd, and
+ *  a route that never reaches `render` cannot have a handler in main.js. The first
+ *  version of this test reported all three as routes with no page, which is how a table
+ *  that was entirely correct looked broken. */
+function routes() {
+    return [...routerSrc.matchAll(/\{ name:\s*"([^"]+)"([^}]*)\}/g)].map((m) => ({
+        name: m[1],
+        redirects: /\bredirect\s*:/.test(m[2])
+    }));
+}
+
+function routeNames() {
+    return routes().map((r) => r.name);
+}
+
+test("every route has a page, and every page is a route", () => {
+    // `PAGES` is an object literal, so the keys are readable text.
+    const block = mainSrc.match(/const PAGES = \{([\s\S]*?)\n\};/);
+    assert.ok(block, "PAGES was not found in main.js");
+    // A key is a shorthand name or a quoted one, at the start of a line, followed by
+    // a comma, a colon or the end of the block. The last alternative matters: the
+    // final entry carries no trailing comma, so requiring one drops the last page —
+    // and it dropped `settings` the first time this ran, which reported a route with
+    // no page on a table that had all thirteen.
+    const keys = [...block[1].matchAll(/^[ \t]*(?:"([^"]+)"|([A-Za-z][\w]*))[ \t]*(?:[:,]|$)/gm)]
+        .map((m) => m[1] ?? m[2]);
+
+    const declared = routes();
+    for (const { name, redirects } of declared) {
+        if (redirects) continue;
+        assert.ok(keys.includes(name), `route "${name}" has no page in main.js`);
+    }
+    for (const key of keys) {
+        if (key === "notFound") continue;
+        assert.ok(declared.some((r) => r.name === key),
+            `main.js has a page for "${key}", which is not a route`);
+    }
+});
+
+test("a legacy URL is answered rather than 404'd, and lands somewhere that exists", () => {
+    // The three legacy shapes are matched rather than 404'd, so a bookmark written
+    // before an exercise belonged to a goal still reaches something. A redirect to a
+    // path that is ITSELF unmatched is worse than a 404: it replaces "this page is
+    // gone" with a second hop that is also gone, and the reader never learns which of
+    // their links are stale.
+    //
+    // Checked against the router's OWN `match`, imported rather than re-implemented
+    // here. A copy of the table in this file is a second opinion about what the app
+    // serves, and a second opinion is exactly what this suite exists not to have.
+    const legacy = [
+        { path: "/exercise", lands: "/" },
+        { path: "/exercise?id=abc", lands: "/exercise/abc" },
+        { path: "/exercise/build?goal=abc", lands: "/goal/abc/exercise/build" },
+        // No `?goal=`, which used to mean "the newest active goal". It now means the
+        // goal list: a link that does not say which plan it is for is answered by the
+        // screen where one can be chosen, not by a doubled slash and a not-found page.
+        { path: "/exercise/build", lands: "/goal" },
+        { path: "/exercise/result?id=abc", lands: "/exercise/abc/result" },
+        { path: "/exercise/result", lands: "/" }
+    ];
+    for (const { path, lands } of legacy) {
+        const route = match(path.split("?")[0]);
+        assert.ok(route, `the legacy path ${path} matches no route at all`);
+        assert.ok(route.name.startsWith("legacy-"),
+            `${path} matched "${route.name}", which draws a page instead of redirecting — ` +
+            `an exact literal placed after a parameterised pattern is unreachable`);
+        // AND THE RULE CARRIES ITS ANSWER. `match` returning only `{name, params}` while
+        // the table declared `redirect` produced `route.redirect is not a function` on
+        // every old link — so this asserts the field is there, not just the name.
+        assert.equal(typeof route.redirect, "function",
+            `route "${route.name}" declares a redirect but match() does not return it`);
+        const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?") + 1) : "");
+        assert.equal(route.redirect(path.split("?")[0], query), lands,
+            `${path} redirects somewhere other than ${lands}`);
+        assert.ok(match(lands),
+            `${path} would redirect to ${lands}, which no route matches`);
+    }
+});
+
+test("no route is shadowed by an earlier one", () => {
+    // THE ORDER OF THE TABLE IS PART OF THE ROUTER, because `match` returns the first
+    // pattern that matches and every pattern here is a regex.
+    //
+    // `/exercise/([^/]+)` matches `/exercise/build` with the id "build". A
+    // `/exercise/build` link therefore reached the RUNNER, failed to load an exercise
+    // with that id, and drew "that is not here any more" — from a table that contained
+    // a perfectly good `/exercise/build` rule two lines further down. Nothing about the
+    // table looks wrong, so this is the shape of bug that ships.
+    //
+    // THE DIRECTION MATTERS and the first version of this test had it backwards. It
+    // asked whether an earlier pattern matches a LATER route's own pattern text, which
+    // is not the question: the question is whether an earlier pattern matches the PATH a
+    // later literal route exists to serve. Probing with pattern text instead of a
+    // concrete path reported the table as clean while `/exercise/build` was unreachable.
+    // So each literal route contributes the path it is FOR, and each parameterised route
+    // contributes a segment no literal contains.
+    const declared = [...routerSrc.matchAll(
+        /\{\s*name:\s*"([^"]+)",\s*pattern:\s*(\/\^.*?\/[a-z]*)/g
+    )].map((m) => ({ name: m[1], source: m[2].slice(1, m[2].lastIndexOf("/")) }));
+
+    assert.ok(declared.length >= 15, `only ${declared.length} routes were parsed; the regex is probably wrong`);
+
+    /** The path this route exists to serve, or `null` if it is more than a literal plus
+     *  `([^/]+)` — this codebase has no other character classes, and a route with one is
+     *  skipped rather than guessed at. */
+    const samplePath = (source) => {
+        if (!source.startsWith("^") || !source.endsWith("$")) return null;
+        const body = source.slice(1, -1);
+        if (/\[\^?\/?\]/.test(body)) {
+            // `([^/]+)` is the only class this app uses and it stands for a segment.
+            const parts = body.split("([^/]+)");
+            if (parts.length > 3) return null;
+            return parts.join("ZZPARAMZZ").replace(/\\\//g, "/");
+        }
+        if (/[()[\]|*+?{}^$]/.test(body)) return null;
+        return body.replace(/\\\//g, "/");
+    };
+
+    for (let i = 0; i < declared.length; i += 1) {
+        const path = samplePath(declared[i].source);
+        if (!path) continue;
+        for (let j = 0; j < i; j += 1) {
+            const earlier = new RegExp(declared[j].source.replace("([^/]+)", "ZZPARAMZZ"));
+            assert.ok(
+                !earlier.test(path),
+                `the path ${path} that route "${declared[i].name}" exists to serve is also matched by ` +
+                `"${declared[j].name}", which is declared FIRST — so "${declared[i].name}" can never fire`
+            );
+        }
+    }
+});
+
+test("every page main.js imports is actually exported by that module", () => {
+    // The other half of the same bug: an alias that names nothing. `render as
+    // groupView` when the module exports `renderGroup` imports `render` TWICE under
+    // two names, both of which are real — so this is only catchable by comparing the
+    // import against the module's own export list, which is what the page table test
+    // above cannot do because both bindings are defined.
+    const imports = [...mainSrc.matchAll(/import\s*\{([^}]+)\}\s*from\s*"\.\/([^"]+)"/g)];
+    assert.ok(imports.length >= 10, `only ${imports.length} imports were scanned; the regex is probably wrong`);
+
+    for (const [, clause, path] of imports) {
+        const source = read(`../app/js/${path}`);
+        const exported = new Set([
+            ...[...source.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1]),
+            ...[...source.matchAll(/export\s+(?:const|let|class)\s+(\w+)/g)].map((m) => m[1])
+        ]);
+
+        for (const spec of clause.split(",")) {
+            const part = spec.trim();
+            if (!part) continue;
+            // `render as groupView` — the SOURCE name is what the module must export.
+            const named = part.split(/\s+as\s+/)[0].trim();
+            assert.ok(
+                exported.has(named),
+                `main.js imports { ${part} } from ${path}, which does not export "${named}"`
+            );
+        }
+    }
 });
 
 test("the Dockerfile builds the app rather than shipping the template", () => {

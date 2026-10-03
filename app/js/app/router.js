@@ -16,32 +16,135 @@
 //     tab mid-question) is the one that is hardest to intercept. An exercise is
 //     resumable, so the guard's real job is to stop a half-tapped question being
 //     skipped, not to prevent data loss.
-
+//
+// THE SHAPE OF THE URL IS THE MODEL.
+//
+// AN EXERCISE IS PART OF A GOAL, so the two halves of that live at different depths
+// for different reasons, and both are deliberate:
+//
+//   /goal/:id                     the goal. Its plan, what it is made of, and its
+//                                 exercises — the open ones with a resume button and
+//                                 the finished ones with a result and a repeat button.
+//                                 This is where an exercise is DECIDED.
+//   /goal/:id/exercise/build      choosing what an exercise will ask. It names the
+//                                 goal in the PATH rather than a `?goal=` because
+//                                 there is nothing to fall back to any more: an
+//                                 exercise belongs to a goal and the reader is on
+//                                 that goal's page.
+//   /exercise/:id                 RUNNING one. A mode rather than a page: full screen,
+//                                 one question, a clock, a leave guard. The goal is not
+//                                 in the URL because the exercise record carries it and
+//                                 putting it in the path would create a URL that can
+//                                 name a goal the exercise does not belong to.
+//
+// WHAT IS NOT HERE, and used to be, is `/exercise` with no id -- a screen that asked
+// "what should I do" and answered it for the newest goal because the URL did not say.
+// That question belonged to the goal page, which knows which goal it is about, and it
+// is answered there from one decision rather than re-derived on a second screen.
+//
+// WHAT IS ALSO NOT HERE is any dependency between questions and a goal in a URL.
+// There is no `/goal/:id/questions`: questions are not under a goal, so there is no
+// such place to go. What a goal has is ATTACHMENTS, and those live on the goal's own
+// page, because that is the decision they are part of.
 const routes = [
+    // THE LEGACY SHAPES COME FIRST, and that ordering is load-bearing rather than
+    // cosmetic. `match()` returns the FIRST pattern that matches, and
+    // `/exercise/([^/]+)` matches `/exercise/build` with the id "build" — so a
+    // `/exercise/build` link was reaching the runner, failing to load an exercise with
+    // that id, and drawing "that is not here any more". An exact literal placed after a
+    // parameterised pattern is not reachable at all, which is a fact about regexes that
+    // is invisible in the table itself: the route is present, looks correct, and can
+    // never fire.
+    //
+    // Each of these was a real URL with bookmarks and history entries behind it, and
+    // `/exercise/result?id=x` is still a link inside a page the service worker cached
+    // last release. They are answered rather than 404'd.
+    { name: "legacy-exercise", pattern: /^\/exercise$/, redirect: (p, q) => resumeHref(q) },
+    // `/exercise/build` with no `?goal=` used to fall back to the newest active goal,
+    // which is the "silently pick a goal" behaviour the whole restructure removed. It
+    // goes to the goal LIST instead: a link with no goal in it is a link that does not
+    // say what it is for, and the honest answer is the screen where one can be chosen.
+    // (`/goal//exercise/build` — a doubled slash and a not-found page — is technically
+    // consistent and practically a dead end.)
+    { name: "legacy-build", pattern: /^\/exercise\/build$/, redirect: (p, q) => {
+        const goal = q.get("goal");
+        return goal ? `/goal/${goal}/exercise/build` : "/goal";
+    } },
+    { name: "legacy-result", pattern: /^\/exercise\/result$/, redirect: (p, q) => (q.get("id") ? `/exercise/${q.get("id")}/result` : "/") },
+
     { name: "home", pattern: /^\/$/ },
     { name: "goal", pattern: /^\/goal$/ },
+    { name: "goal-view", pattern: /^\/goal\/([^/]+)$/, keys: ["id"] },
+    { name: "goal-content", pattern: /^\/goal\/([^/]+)\/content$/, keys: ["id"] },
+    // The picker. Under the goal, because a selection is a decision about that goal.
+    { name: "exercise-build", pattern: /^\/goal\/([^/]+)\/exercise\/build$/, keys: ["id"] },
+    // Running an exercise. The id is REQUIRED: `/exercise` on its own was the dispatch
+    // screen, and it is the goal page's job now. A deep link to it lands on the home
+    // page rather than on a 404, because a reader following an old bookmark wants to be
+    // taken somewhere they can carry on from.
+    { name: "exercise", pattern: /^\/exercise\/([^/]+)$/, keys: ["id"] },
+    { name: "result", pattern: /^\/exercise\/([^/]+)\/result$/, keys: ["id"] },
+    { name: "archive", pattern: /^\/archive$/ },
     { name: "questions", pattern: /^\/questions$/ },
     { name: "question-new", pattern: /^\/questions\/new$/ },
     { name: "question-edit", pattern: /^\/questions\/([^/]+)$/, keys: ["id"] },
-    { name: "exercise", pattern: /^\/exercise$/ },
-    { name: "result", pattern: /^\/exercise\/result$/ },
+    { name: "groups", pattern: /^\/groups$/ },
+    { name: "group-view", pattern: /^\/groups\/([^/]+)$/, keys: ["id"] },
     { name: "reports", pattern: /^\/reports$/ },
     { name: "settings", pattern: /^\/settings$/ }
 ];
+
+/** An old `/exercise?id=x` link is still an instruction to run exercise x, and it is
+ *  the commonest of the three legacy shapes because the nav bar used to produce one. */
+function resumeHref(query) {
+    const id = query.get("id");
+    return id ? `/exercise/${encodeURIComponent(id)}` : "/";
+}
+
+/**
+ * The address a path SHOULD be, or `path` itself.
+ *
+ * IT IS RESOLVED IN `go()` RATHER THAN IN `render()` because a redirect that renders
+ * without moving the address bar is not a redirect. `render` is reached from inside the
+ * render promise, and the only way it can change the URL is `history.replaceState` plus
+ * setting `current` by hand — and the first version did it through `go(..., {fromHistory:
+ * true})`, which is the flag that means "do not write a history entry". So the reader was
+ * shown the new page at the old address, and Reload, Back and "copy link" all went to a
+ * URL that only worked because of a rule in this file.
+ *
+ * Resolving it first means the move below is an ordinary move: one entry written, the
+ * new path in the address bar, and the page drawn from it.
+ */
+function resolveRedirect(path) {
+    const pathname = path.split("?")[0];
+    const route = match(pathname);
+    if (!route?.redirect) return path;
+    const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?") + 1) : "");
+    return route.redirect(pathname, query);
+}
 
 let renderFn = null;
 let leaveGuard = null;
 let current = "/";
 let token = 0;
 
-/** Match a pathname to a route. `null` means the 404 page. */
+/**
+ * Match a pathname to a route. `null` means the 404 page.
+ *
+ * `redirect` IS CARRIED THROUGH, and the reason is a bug this function had for one
+ * revision: the three legacy rules declare `redirect`, and `match` returned only
+ * `{name, params}`, so `route.redirect` was `undefined` and calling it threw
+ * `TypeError: route.redirect is not a function` — on every old link, with the reader
+ * looking at a page that had already half-replaced. The match result is the route, not
+ * a summary of it; anything the table says about a route is part of what it means.
+ */
 export function match(path) {
     for (const route of routes) {
         const found = route.pattern.exec(path);
         if (!found) continue;
         const params = {};
         (route.keys ?? []).forEach((key, i) => { params[key] = decodeURIComponent(found[i + 1]); });
-        return { name: route.name, params };
+        return { name: route.name, params, redirect: route.redirect ?? null };
     }
     return null;
 }
@@ -125,6 +228,17 @@ function onClick(event) {
  *  therefore delays the navigation by however long the reader takes to answer a
  *  dialog, which is the point. */
 export function go(path, { replace = false, fromHistory = false } = {}) {
+    // A REDIRECT REPLACES THE ENTRY rather than pushing onto it. A legacy link that
+    // lands on `/` by pushing has put "the old address" in the history in front of where
+    // the reader is now, so Back goes to a URL that redirects to the page they were just
+    // on -- a trap that only closes after two Backs instead of one.
+    const wanted = resolveRedirect(path);
+    if (wanted !== path) {
+        path = wanted;
+        replace = true;
+        fromHistory = false;
+    }
+
     const move = () => {
         if (!fromHistory) {
             if (replace) history.replaceState(null, "", path);

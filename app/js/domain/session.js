@@ -1,26 +1,35 @@
-// Running an exercise: which question is next, and when it is over.
+// Running a session: which question is next, and when it is over.
 //
-// The session is NOT STORED. This is the clearest case in the app of a rule that
-// runs through all of it — nothing derived is written down — and it is possible
-// only because an attempt log is enough to rebuild the entire state:
+// THE SESSION IS A FROZEN COPY, AND THE QUEUE IS REBUILT FROM THE ATTEMPT LOG.
 //
-//   round  = the highest round number any attempt of this exercise has
-//   queued = the items with no attempt in this round
-//   repeat = the items whose attempt in this round was wrong
-//   passed = everything else
+// Two independent facts, and the second one is new:
 //
-// So a tab that dies mid-exercise, a phone that is locked for three days, and a
-// reload that happens to land between two clicks all resume at the same place,
-// and there is no second copy of the answer key to fall out of step with the
-// first. `resumeSession()` is the whole of the restore path: it is called with
-// the stored items and the stored attempts on every page load of /exercise.
+//   1. NOTHING DERIVED IS STORED. The queue is not a variable, it is not a row, and
+//      it is not a counter: it is computed from the attempt log every time the page
+//      loads, by `resumeSession`. A tab that dies mid-session, a phone locked for
+//      three days, and a reload that lands between two clicks all resume at the same
+//      place, and there is no second copy of the answer key to fall out of step with
+//      the first.
 //
-// The other consequence is the loop: a wrong answer does not end the question, it
-// puts it at the back of the queue for another round. The exercise is finished
-// when the queue is empty AND nothing is waiting to repeat — which means an
-// exercise ends at 100% on its last pass and not at 80% on its first.
+//   2. THE QUESTIONS ARE INSIDE THE SESSION, NOT POINTED AT. Every item carries the
+//      question's text, its kind and its options as they were when the session was
+//      created. So the page never reads the question store to draw a question, and
+//      the progress bar's total is the number of questions this session will actually
+//      ask — which is the property that makes "you cannot add questions to the
+//      current session" a fact about the data rather than a promise the UI makes.
+//
+// The consequence worth stating: `questionId` is still on every item, and nothing
+// here needs the question row to exist. It is what answers "which sessions have
+// asked this question" and what a reader sees listed under the editor. It is a
+// reference for reporting, not a dependency for drawing.
+//
+// The loop is unchanged: a wrong answer does not end the question, it puts it at the
+// back of the queue for another round. The session is finished when the queue is
+// empty AND nothing is waiting to repeat — which means a session ends at 100% on its
+// last pass and not at 80% on its first.
 
 import { ITEM_KIND } from "./exercise-builder.js";
+import { orderOptions } from "./options.js";
 
 /** A session, freshly made: one round, everything in the queue. */
 export function startSession(items) {
@@ -28,11 +37,52 @@ export function startSession(items) {
 }
 
 /**
+ * The question an item carries, in the shape the page draws.
+ *
+ * IT IS THE ITEM AND NOT THE QUESTION STORE, and this is the only function in the
+ * app that has to know that. Every read of "what does this session say to this
+ * reader" goes through here, so the snapshot is read in one place: a page that
+ * reached for the live question would show text the reader has not seen on an item
+ * whose position on the progress bar it is counting.
+ *
+ * `options` falls back to an empty list rather than to the question's current ones.
+ * An item with no frozen options is one written by the version of the app that
+ * predates the snapshot, and drawing it with today's options would be exactly the
+ * failure the snapshot exists to prevent — so it is drawn as unanswerable instead.
+ *
+ * @param {{questionText?: string, questionKind?: string, options?: object[]}} item
+ */
+export function questionOf(item) {
+    return {
+        id: item?.questionId ?? null,
+        text: item?.questionText ?? "",
+        kind: item?.questionKind === "multiple" ? "multiple" : "single",
+        // SORTED HERE, not on the assumption the copy arrived in order.
+        //
+        // The builder does write them in order, and it is tempting to read them as
+        // they are. But the copy also comes back from a sync merge, from a restore,
+        // and from the migration that wrote it by hand — and a frozen option list that
+        // arrived shuffled would number the reader's options wrongly while every
+        // stored `order` was still correct. `orderOptions` is the one function that
+        // knows this rule, and calling it here means the page, the grader and the
+        // report all number the options identically whatever order the row was
+        // assembled in. It is a sort of six small objects per question drawn, once.
+        options: orderOptions(Array.isArray(item?.options) ? item.options : [])
+    };
+}
+
+/** Whether an item can actually be asked: it has text and at least one option. */
+export function isDrawable(item) {
+    const question = questionOf(item);
+    return Boolean(question.text) && question.options.length > 0;
+}
+
+/**
  * Rebuild the session from what has been stored.
  *
- * @param {{id: string}[]} items  the exercise's items, in their stored order
+ * @param {{id: string}[]} items  the session's items, in their stored order
  * @param {{id: string, itemId: string, round: number, correct: boolean}[]} attempts
- *        every attempt of THIS exercise, in any order
+ *        every attempt of THIS session, in any order
  */
 export function resumeSession(items, attempts = []) {
     if (!attempts.length) return startSession(items);
@@ -45,11 +95,11 @@ export function resumeSession(items, attempts = []) {
     //
     // An item answered correctly in round 1 has NO row in round 2, because it is
     // never asked again. Reading only the current round therefore puts every
-    // already-passed question back into the queue the moment a round begins: an
-    // exercise interrupted in its second round asks again everything the reader
+    // already-passed question back into the queue the moment a round begins: a
+    // session interrupted in its second round asks again everything the reader
     // already got right, the item count never drops, and the round counter climbs
     // for work that is already done. "Has this item been answered correctly at
-    // some point in this exercise" is the only question with a single yes/no
+    // some point in this session" is the only question with a single yes/no
     // answer, and it is what `passed` means.
     const latest = new Map();
     for (const a of attempts) {
@@ -92,9 +142,9 @@ export function resumeSession(items, attempts = []) {
     // round is one behind at exactly the moment it matters: after the final wrong
     // answer of a round. Rebuilding from it alone gives the old round, an empty
     // queue and one item in `repeat`, which is a session `currentItem` cannot
-    // answer — it reads `queue[0]` — on an exercise that `isFinished` correctly
-    // says is not over. The page then shows an exercise with nothing on it and no
-    // way forward except reloading, which produces the same session again.
+    // answer — it reads `queue[0]` — on a session that `isFinished` correctly says
+    // is not over. The page then shows a session with nothing on it and no way
+    // forward except reloading, which produces the same session again.
     //
     // An empty queue with something waiting to repeat IS the next round; that is
     // precisely the condition `advance` uses to bump, so the two agree by
@@ -111,7 +161,7 @@ export function resumeSession(items, attempts = []) {
  * @param {{round: number, queue: string[], repeat: string[], passed: string[]}} session
  * @param {{itemId: string, correct: boolean}} answer
  * @returns {{session: object, repeated: boolean, finished: boolean}}
- *   `repeated` is true when this wrong answer has just pushed the exercise into
+ *   `repeated` is true when this wrong answer has just pushed the session into
  *   another round, which the UI uses to say so.
  */
 export function advance(session, { itemId, correct }) {
@@ -161,17 +211,16 @@ export function advance(session, { itemId, correct }) {
     };
 }
 
-/** Whether the exercise is over. Derived, not stored — and the one thing that
- *  has to be true before a single record is stamped `completedAt`.
+/** Whether the session is over. Derived, not stored — and the one thing that has to
+ *  be true before a single record is stamped `completedAt`.
  *
- *  AN EXERCISE WITH NO ITEMS IS NOT OVER, IT IS UNANSWERABLE. `isFinished({queue:
- *  [], repeat: []})` is true by construction, and that is the right answer to
- *  "is there anything left to ask" — but the reader of this function is the one
- *  that stamps `completedAt`, and an open exercise whose every question was
- *  deleted while it sat there has nothing to ask and must not be recorded as an
- *  exercise that asked zero questions and was passed. `hasItems` is the second
- *  half of the predicate, and it defaults to true so every existing caller keeps
- *  the meaning it had. */
+ *  A SESSION WITH NO ITEMS IS NOT OVER, IT IS UNANSWERABLE. `isFinished({queue: [],
+ *  repeat: []})` is true by construction, and that is the right answer to "is there
+ *  anything left to ask" — but the reader of this function is the one that stamps
+ *  `completedAt`, and an open session whose items were all tombstoned by a migration
+ *  has nothing to ask and must not be recorded as a session that asked zero
+ *  questions and was passed. `hasItems` is the second half of the predicate, and it
+ *  defaults to true so every existing caller keeps the meaning it had. */
 export function isFinished(session, hasItems = true) {
     return hasItems
         && session.queue.length === 0
@@ -179,12 +228,12 @@ export function isFinished(session, hasItems = true) {
 }
 
 /**
- * The numbers the head of the exercise page shows.
+ * The numbers the head of the session page shows.
  *
- * `remaining` counts the queue AND the repeat, because an item waiting for
- * round 3 is still a question the reader has not answered right. Counting only
- * the queue would show "0 left" with four wrong answers still pending, and then
- * keep the page open.
+ * `remaining` counts the queue AND the repeat, because an item waiting for round 3
+ * is still a question the reader has not answered right. Counting only the queue
+ * would show "0 left" with four wrong answers still pending, and then keep the page
+ * open.
  */
 export function progress(session, total) {
     const done = session.queue.length === 0 && session.repeat.length === 0
@@ -209,19 +258,18 @@ export function currentItem(session, items) {
 /** How many of the wrong answers so far were new material rather than review —
  *  the number the result page shows next to "you got the new ones right".
  *
- *  COUNTED PER ITEM, NOT PER ROW. An exercise of five new items where two were
+ *  COUNTED PER ITEM, NOT PER ROW. A session of five new items where two were
  *  answered wrongly and then correctly produces seven attempt rows for five
- *  questions, and counting rows said "7 new questions" on a page whose exercise
+ *  questions, and counting rows said "7 new questions" on a page whose session
  *  asked five — so the two figures on screen (5 items, 7 new) could not both be
  *  right and neither had a way to be checked. Every item is counted once, on its
- *  LAST attempt, which is the same "latest wins" rule the session itself is
- *  rebuilt by: an item answered wrongly and then rightly is an item the reader
- *  got right.
+ *  LAST attempt, which is the same "latest wins" rule the session itself is rebuilt
+ *  by: an item answered wrongly and then rightly is an item the reader got right.
  *
  *  `firstCorrect` / `firstTotal` are the round-one figures, and they are counted
  *  from the row for round 1 rather than derived from the last one, because "what
- *  did you get right the first time" is a different question from "what did you
- *  end up knowing" and the result page has to be able to answer both. */
+ *  did you get right the first time" is a different question from "what did you end
+ *  up knowing" and the result page has to be able to answer both. */
 export function countKinds(items, attempts) {
     const byId = new Map(items.map((i) => [i.id, i]));
     const out = {
@@ -249,7 +297,7 @@ export function countKinds(items, attempts) {
         }
     }
 
-    // Round 1, one row per item — the exercise cannot ask an item twice in a
+    // Round 1, one row per item — the session cannot ask an item twice in a
     // round, so counting the rows of round 1 IS counting the questions of round 1.
     for (const a of attempts) {
         if (a.round !== 1) continue;
@@ -266,10 +314,10 @@ export function countKinds(items, attempts) {
  * These are the two numbers a report about repetition is actually about, and they
  * are not the accuracy over every tap: a question answered wrongly three times and
  * then correctly is one that was not learned, and averaging all five taps hides
- * exactly the thing the exercise was built to find.
+ * exactly the thing the session was built to find.
  *
  * @param {{id: string}[]} items
- * @param {{itemId: string, round: number, correct: boolean, id: string}[]} attempts
+ * @param {{itemId: string, round: number, correct: boolean, id: string}}[] attempts
  */
 export function firstPass(items, attempts) {
     const itemIds = new Set(items.map((i) => i.id));
@@ -282,10 +330,9 @@ export function firstPass(items, attempts) {
     }
 
     // The first-ATTEMPT total is the number of items that were ever asked, not the
-    // number of round-one rows: an exercise abandoned before the last question has
-    // a smaller first-attempt total than it has items, and reporting the full item
-    // count as the denominator would score the reader on a question they never
-    // saw.
+    // number of round-one rows: a session abandoned before the last question has a
+    // smaller first-attempt total than it has items, and reporting the full item
+    // count as the denominator would score the reader on a question they never saw.
     const asked = first.size;
     const correctOnFirst = [...first.values()].filter((a) => a.correct).length;
     const reasks = attempts.length - asked;
@@ -297,9 +344,10 @@ export function firstPass(items, attempts) {
         reasks: Math.max(0, reasks),
         percent: asked === 0 ? 100 : Math.round((correctOnFirst / asked) * 100),
         // The ids of the items whose first answer was wrong, in the order they were
-        // first asked. The result page turns these into "here is what you got
-        // wrong, and here is the right answer", which is the one part of a report
-        // that is worth writing anything at all for.
+        // first asked. The result page turns these into "here is what you got wrong,
+        // and here is the right answer" — read from the item's own frozen copy, so
+        // it is the answer that was on screen and not the one in the question store
+        // today.
         wrongItemIds: [...first.entries()]
             .filter(([, a]) => !a.correct)
             .sort((a, b) => (a[1].answeredAt - b[1].answeredAt) || (a[1].id < b[1].id ? -1 : 1))

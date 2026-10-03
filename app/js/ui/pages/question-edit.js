@@ -20,14 +20,15 @@
 // exactly the row they name. It does not decide which field is wrong — that is
 // domain/validation.js, the same code the API runs.
 
-import { h, link, frag, mount } from "../dom.js";
+import { h, link, mount } from "../dom.js";
 import { head, section, card, destructiveButton } from "../page.js";
 import { field, textInput, textareaInput, selectInput, form, submitButton } from "../fields.js";
 import * as toast from "../toast.js";
-import { t } from "../../i18n/i18n.js";
+import { t, formatDateTime } from "../../i18n/i18n.js";
 import { LIMITS, QUESTION_KINDS } from "../../domain/validation.js";
-import { snapshot } from "../../services/goal-service.js";
+import * as groups from "../../services/group-service.js";
 import * as questions from "../../services/question-service.js";
+import * as content from "../../services/goal-content-service.js";
 import { go } from "../../app/router.js";
 
 /**
@@ -36,16 +37,17 @@ import { go } from "../../app/router.js";
  *   `params` is a property OF the matched route, so reading it off the context
  *   directly is a crash on both this screen's two paths, and the `/questions/new`
  *   one is reached by a link a reader taps within a minute of setting the app up.
+ *
+ * The GOAL and the GROUP come from the query string, not from the context:
+ * `/questions/new?goal=abc&group=xyz` means "a new question, in that goal, filed
+ * under that group", which is the link every list in the app uses and the only way
+ * a question can be created already knowing where it belongs. Without the query the
+ * page falls back to the newest goal and the goal's unfiled group, so the bare
+ * `/questions/new` link in the nav still works.
  */
 export async function render(ctx) {
     const params = ctx?.route?.params ?? {};
-
-    const { goal } = await snapshot();
-    if (!goal) {
-        return { node: h("div.stack", null, head("question.new_title", null),
-            h("p.muted", { text: t("home.no_goal_body") }),
-            link("/goal", t("home.create_goal"), { class: "btn" })) };
-    }
+    const groupId = ctx?.query?.get("group") ?? null;
 
     const existing = params.id ? await questions.load(params.id) : null;
     if (params.id && !existing) {
@@ -54,12 +56,42 @@ export async function render(ctx) {
         return { node: notFound() };
     }
 
-    return { node: editor(goal, existing) };
+    // NO GOAL IS ASKED FOR, AND NO GOAL IS REQUIRED. Not "the question's own" and not
+    // "the newest active one" — neither, because a question has no goal and a goal
+    // has no questions, and the only thing between them is a reference the reader
+    // makes on the goal's page.
+    //
+    // The version this replaces asked twice and got it wrong both ways. It read the
+    // goal off the URL when there was one and off `snapshot()`'s default of the
+    // NEWEST active goal when there was not, then wrote that back onto the question on
+    // save — so opening a question from a bookmark, or from the reports page's "needs
+    // work" list, filed it under whichever subject happened to be newest, and every
+    // answer the reader had ever given it went with it. A "which goal" select existed
+    // here for the same reason and was worse: it was a MOVE control wearing a "file
+    // under" label, and a reader tidying twenty shared questions between two subjects
+    // had to open each one in turn to do it.
+    //
+    // Both are gone because there is nothing to choose. Sharing a question between two
+    // goals is now one tap on each goal, and it cannot be done by accident.
+    const [groupList, unfiled] = await Promise.all([groups.list(), groups.unfiled()]);
+
+    // AN ID THAT IS NOT IN THE LIST IS REPLACED BY UNFILED, for both a new question
+    // and an existing one. A select whose stored value matches no option shows its
+    // FIRST option and reports that as the value on change, so leaving a stale id in
+    // would file the question into whichever group happened to be alphabetically
+    // first — a question silently changing shelf because its shelf was deleted
+    // somewhere else. `null` and `undefined` both mean unfiled, so an existing
+    // question written before groups existed lands there too.
+    const known = new Set(groupList.map((g) => g.id));
+    const requested = existing ? existing.groupId : groupId;
+    const groupIdFor = requested && known.has(requested) ? requested : unfiled.id;
+
+    return { node: editor(existing, { groupList, unfiled, groupId: groupIdFor }) };
 }
 
 /* -------------------------------- editor --------------------------------- */
 
-function editor(goal, existing) {
+function editor(existing, { groupList, unfiled, groupId }) {
     // The draft is the state. Rows are rebuilt from it, so removing option 2 of 4
     // renumbers what is left and every error message that referred to an index
     // is cleared by the same operation — an index-keyed error map kept alongside
@@ -68,6 +100,11 @@ function editor(goal, existing) {
     const draft = {
         text: existing?.text ?? "",
         kind: existing?.kind ?? "single",
+        // AN EXISTING QUESTION KEEPS ITS GROUP even when the URL names a different
+        // one: the query is where a NEW question should be filed, and a link that
+        // came from another group's list must not silently re-file a question the
+        // reader opened from the question list.
+        groupId: groupId ?? unfiled.id,
         options: existing?.options?.map((o) => ({
             id: o.id,
             text: o.text,
@@ -116,6 +153,40 @@ function editor(goal, existing) {
     const optionsError = h("div.field-error", { hidden: true, role: "alert" });
     const rowErrors = new Map();
 
+    /**
+     * Which shelf this question is filed on.
+     *
+     * A SELECT, and not a fixed set of chips: the list is however many groups the
+     * reader has made, and a select scrolls when there are fifty of them while a row
+     * of fifty chips does not. The unfiled group is IN the list under its own name,
+     * because it is a group like any other and a reader moving a question out of a
+     * group needs somewhere to move it to that is visible on the same control.
+     *
+     * THERE IS NO GOAL CONTROL HERE, and its absence is the point rather than a gap.
+     * A group is a shelf belonging to nobody; which goals draw on it is a decision
+     * made on each goal's own page, and the same shelf can serve three of them. The
+     * picker that used to sit here was a "which goal does this question belong to"
+     * select, and it could only ever have one answer — a question in one goal — so it
+     * was a move control with a filing label on it, and a reader who wanted the same
+     * twenty words in two subjects had to open each question and change it.
+     */
+    const placeField = field({
+        labelKey: "question.field_group",
+        hintKey: "question.hint_group",
+        control: selectInput({
+            value: draft.groupId,
+            // A reader who has never filed anything still gets one option here — the
+            // unfiled shelf, under its own name — and it is created on demand rather
+            // than left as an empty select, because a `<select>` with no options is a
+            // control that looks broken and says nothing.
+            options: groupList.map((g) => ({ value: g.id, label: g.name }))
+                .concat([{ value: "", label: t("question.no_group") }])
+        })
+    });
+    placeField.control.addEventListener("change", () => {
+        draft.groupId = placeField.control.value || null;
+    });
+
     function drawOptions() {
         optionsError.hidden = true;
         const rows = draft.options.map((option, index) => optionRow(option, index));
@@ -129,16 +200,28 @@ function editor(goal, existing) {
     }
 
     /**
-     * One answer: the text, whether it is the answer, and — only above the
-     * minimum — the button that removes it.
+     * One answer: its number, its text, whether it is the answer, and — only
+     * above the minimum — the button that removes it.
      *
-     * ALL THREE ON ONE ROW. The remove button used to sit on a second row of its
+     * ALL FOUR ON ONE ROW. The remove button used to sit on a second row of its
      * own, full width, under every option: six options meant six extra 44px rows
      * of a screen doing nothing, and the thing the reader is most likely to want
      * — delete the fourth answer they typed by mistake — was the smallest target
      * in the form. Here it is beside the other control for that option, at the
      * same height, and the row is `flex-wrap` so it moves under the box rather
      * than beside it on a 320px screen.
+     *
+     * THE CORRECT MARK IS VISIBLE, WHICH IS THE WHOLE POINT OF THIS ROW.
+     *
+     * It used to be a `<button>` whose only state change was `aria-pressed`, and
+     * the stylesheet has no `aria-pressed` rule for a button — only for
+     * `.option`, which is the exercise page's answer row. So every option looked
+     * exactly the same whether or not it was the answer: the reader could tick
+     * three options, save, and have no way to tell which three the app stored.
+     * It is a real `<input type="checkbox">` now, inside a label that carries the
+     * word, and the whole row is tinted — three cues, because the checkbox alone
+     * is a 22px target and the tint alone is invisible to a reader who cannot see
+     * it.
      */
     function optionRow(option, index) {
         const input = textInput({ value: option.text, maxlength: LIMITS.OPTION_MAX });
@@ -151,43 +234,47 @@ function editor(goal, existing) {
             input.removeAttribute("aria-invalid");
         });
 
-        const remove = h("button.btn.btn-quiet.option-remove", {
-            type: "button",
-            // Not offered below the minimum: see the header.
-            hidden: draft.options.length <= LIMITS.OPTIONS_MIN,
-            "aria-label": t("question.remove_option"),
-            onclick: () => {
-                draft.options.splice(index, 1);
-                drawOptions();
-            }
-        }, t("question.remove_option"));
-
-        const box = h("div", null,
-            h("div.row.option-row", { style: { "gap": "var(--space-2)", "align-items": "center" } },
-                input,
-                h("button.btn.btn-secondary", {
-                    type: "button",
-                    // The check is a separate control from the text box, so it can
-                    // be a real checkbox with a real label and the reader never
-                    // has to aim at a 20px square to say "this is the answer".
-                    "aria-pressed": option.isCorrect ? "true" : "false",
-                    style: { "flex": "0 0 auto", "min-width": "5.5rem" },
-                    onclick: (event) => {
-                        if (draft.kind === "single") {
-                            for (const other of draft.options) other.isCorrect = false;
-                            option.isCorrect = true;
-                            drawOptions();
-                            return;
-                        }
-                        option.isCorrect = !option.isCorrect;
-                        event.currentTarget.setAttribute("aria-pressed", option.isCorrect ? "true" : "false");
-                    }
-                }, t("question.option_correct")),
-                remove
-            ),
-            message
+        const checkbox = h("input", { type: "checkbox", checked: option.isCorrect });
+        const correctLabel = h("label.option-correct", null,
+            checkbox,
+            h("span", { text: t("question.option_correct") })
         );
-        return box;
+
+        const row = h("div.option-edit", { dataset: { correct: String(Boolean(option.isCorrect)) } },
+            // The position, written down. The options are shown in the order they
+            // were typed, always — see `exercise-service.load()` — so "the third
+            // one" has to mean the same thing here and on the other device.
+            h("span.option-index", { text: String(index + 1) }),
+            input,
+            correctLabel,
+            h("button.btn.btn-quiet.option-remove", {
+                type: "button",
+                // Not offered below the minimum: see the header.
+                hidden: draft.options.length <= LIMITS.OPTIONS_MIN,
+                "aria-label": t("question.remove_option"),
+                onclick: () => {
+                    draft.options.splice(index, 1);
+                    drawOptions();
+                }
+            }, t("question.remove_option"))
+        );
+
+        checkbox.addEventListener("change", () => {
+            if (draft.kind === "single") {
+                // Keep the one that was just ticked and clear the rest. A redraw
+                // rather than an attribute write because three other rows are now
+                // showing a mark they should not be showing, and there is one rule
+                // here rather than four copies of it.
+                for (const other of draft.options) other.isCorrect = false;
+                option.isCorrect = true;
+                drawOptions();
+                return;
+            }
+            option.isCorrect = checkbox.checked;
+            row.dataset.correct = String(option.isCorrect);
+        });
+
+        return h("div", null, row, message);
     }
 
     function addButton() {
@@ -206,10 +293,11 @@ function editor(goal, existing) {
     const body = form(async () => {
         save.setBusy(true);
         clearErrors();
-        const result = await questions.save(goal.id, {
+        const result = await questions.save({
             id: existing?.id,
             text: draft.text,
             kind: draft.kind,
+            groupId: draft.groupId,
             options: draft.options
         });
         if (!result.ok) {
@@ -218,10 +306,15 @@ function editor(goal, existing) {
             return;
         }
         toast.show("toast.question_saved");
+        // Back to the list. No goal in the URL, and no group either: the question may
+        // have just been filed on a different shelf, and a list filtered by the old
+        // one would not contain it — which is the same reason the old link carried
+        // `?goal=` and this one carries nothing.
         go("/questions");
     },
     h("div.stack", null,
         kindField.node,
+        placeField.node,
         textField.node,
         section("question.field_options", optionsBox),
         save.node
@@ -261,6 +354,12 @@ function editor(goal, existing) {
         head(existing ? "question.edit_title" : "question.new_title", null,
             link("/questions", t("common.back"), { class: "btn btn-quiet" })),
         card(body),
+        // WHERE THIS QUESTION HAS BEEN ASKED. Only for a question that exists, since
+        // it is a question about a question. This is the payoff of an item being a row
+        // pointing at a question rather than a column on it: the question has no list
+        // of its exercises, and asking for one is a query. The section is below the
+        // form because it is a fact ABOUT the question rather than a way to change it.
+        existing ? askedInSection(existing) : null,
         existing
             ? destructiveButton("question.delete", {
                 titleKey: "questions.delete_title",
@@ -274,6 +373,96 @@ function editor(goal, existing) {
     );
 
     return node;
+}
+
+/**
+ * The exercises this question has been in.
+ *
+ * IT IS A LIST AND NOT A COUNT, and the rows say whether the exercise is finished,
+ * because "this has been asked twice" and "this is sitting open right now on your
+ * phone" call for different responses from a reader deciding whether to revise it.
+ * A bare count would hide the second case entirely — the two open exercises and the
+ * two finished ones are both "2".
+ *
+ * AND IT IS NOT A HISTORY OF THIS QUESTION. An exercise the plan drew that happened to
+ * include it is here, and one the reader built by naming it is here, and nothing
+ * stored distinguishes them. So the heading says "asked in" rather than "your history
+ * of this question": the reader is being told which of their sessions carry it, which
+ * is the thing they can act on, rather than being shown a story about the question's
+ * life that the records cannot support.
+ *
+ * DRAWN AFTER THE PAGE HAS RENDERED, and the section is left in place with its own
+ * empty state if the read fails. A question whose exercise list cannot be read is
+ * still a question that can be edited and saved, and an editor that refuses to draw
+ * because a side panel failed would be losing the reader's edit over a detail.
+ */
+function askedInSection(question) {
+    const container = h("div.stack-tight");
+
+    // Both facts about this question, read together because they are the two things a
+    // reader opens the editor to find out: which sessions have asked it, and which
+    // goals train on it. The second is new — a question has no goal, so "which goals
+    // use this" is a query and it is the query that replaced a field.
+    Promise.all([
+        questions.exercisesFor(question.id),
+        content.goalsUsingQuestion(question.id)
+    ]).then(([list, goals]) => {
+        // `mount` rather than `replaceChildren`: the list is a `.map` and the fallback is a
+        // one-element array, and the native method takes Nodes only — an array would
+        // be printed as "[object HTMLDivElement]". See `mount` in ui/dom.js.
+        const parts = [];
+        if (goals.length) {
+            parts.push(h("p.small.muted", {
+                text: t("content.used_by_goals", { n: String(goals.length) })
+            }));
+            parts.push(h("div.row", { style: { gap: "var(--space-1)", "flex-wrap": "wrap" } },
+                ...goals.map((goal) => link(
+                    `/goal/${encodeURIComponent(goal.id)}`,
+                    goal.title,
+                    { class: "chip" }
+                ))
+            ));
+        }
+        parts.push(...(list.length
+            ? list.map((exercise) => exerciseRow(exercise))
+            : [h("p.muted", { text: t("question.never_asked") })]));
+        mount(container, ...parts);
+    }).catch(() => {
+        mount(container, h("p.muted", { text: t("question.asked_unknown") }));
+    });
+
+    return section("question.asked_heading", card(container));
+}
+
+/** One exercise the question has been an item of.
+ *
+ *  THE "CHOSEN" MARK IS ABOUT THE RECORD, NOT THE READER'S INTENT. An exercise is
+ *  marked when it carries a selection — `groupIds` or `questionIds` — which means it
+ *  was built by the picker rather than drawn by the plan. It does not mean the reader
+ *  picked THIS question on purpose: a question can be in a named group the exercise
+ *  took whole. The mark is here because "was this session mine or the app's?" is the
+ *  question a reader is asking when they open this list, and the record can answer
+ *  the first half of it even though it cannot answer the second.
+ */
+function exerciseRow(exercise) {
+    const chosen = Boolean(exercise.groupIds?.length || exercise.questionIds?.length);
+
+    return h("div.card.card-quiet.row-between", { style: { "gap": "var(--space-2)" } },
+        h("div.grow", null,
+            link(`/exercise/result?id=${encodeURIComponent(exercise.id)}`,
+                t("exercise.row_done", { n: String(exercise.number) })),
+            // The DATE, and "open" for one that has not been finished — because a
+            // session still sitting open on this device is the row a reader revising
+            // this question most needs to notice, and a timestamp alone hides it
+            // among a column of dates.
+            h("div.tiny.muted", {
+                text: exercise.completedAt
+                    ? formatDateTime(exercise.completedAt)
+                    : t("question.asked_open")
+            })
+        ),
+        chosen ? h("span.tiny.muted", { text: t("question.chosen") }) : null
+    );
 }
 
 function notFound() {

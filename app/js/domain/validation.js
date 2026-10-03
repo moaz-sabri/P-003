@@ -29,8 +29,19 @@ export const LIMITS = {
     OPTION_MAX: 200,
     OPTIONS_MIN: 2,
     OPTIONS_MAX: 6,
+    /** A group's name is drawn on a chip beside every question filed under it, on
+     *  a 320px screen, next to the goal it belongs to. A name longer than this is
+     *  not a label any more. */
+    GROUP_NAME_MAX: 40,
     NEW_PER_EXERCISE_MIN: 1,
     NEW_PER_EXERCISE_MAX: 20,
+    /** The most items an exercise the reader NAMED may carry. It exists because a
+     *  selection has no natural ceiling: `newPerExercise` bounds the plan, and the
+     *  plan is what a selection replaces. "Everything in this goal" is four hundred
+     *  questions and an exercise is a sitting — this is the number past which the
+     *  session stops being something anybody finishes, and the picker warns before
+     *  the reader crosses it rather than the builder refusing afterwards. */
+    EXERCISE_ITEMS_MAX: 120,
     REVIEW_DEPTH_MIN: 1,
     REVIEW_DEPTH_MAX: 6,
     INTERVAL_DAYS_MIN: 1,
@@ -250,6 +261,49 @@ export function validateQuestion(draft = {}) {
         errors,
         values: { text, kind, options: cleaned }
     };
+}
+
+/* --------------------------------- group ---------------------------------- */
+
+/**
+ * Check a group's name.
+ *
+ * A group is only ever created by a reader naming it, so there is no default name
+ * to fall back to and an unnamed one is refused rather than invented — the same
+ * reason a goal will not do without a title.
+ *
+ * UNIQUENESS IS DEVICE-WIDE, on the folded form. Two groups with the same name make
+ * every picker ambiguous — "Verbs" and a second "Verbs" on the chips above a session
+ * are indistinguishable — and the fold is there because an Arabic reader typing the
+ * same name in a second hamza form has not made two groups. The caller's own name is
+ * not a clash with itself, or renaming "Verbs" to "Verbs" would be refused for being a
+ * duplicate of "Verbs"; the caller excludes it by passing the siblings without it.
+ *
+ * IT USED TO BE UNIQUENESS WITHIN A GOAL, and that was correct exactly as long as a
+ * group was a goal's private classification. It is not now, because a group belongs to
+ * nobody: a shelf is shared, so a device-wide check is the only one whose result
+ * matches what the reader can see. `group-service.create` passes the whole list for
+ * exactly this reason, and the second one it would otherwise reject could have been a
+ * different goal's group all along.
+ *
+ * @param {{name: string}} draft
+ * @param {string[]} existingNames  the names this group may not take
+ */
+export function validateGroup(draft = {}, existingNames = []) {
+    const errors = {};
+
+    const name = cleanText(draft.name);
+    if (!name) errors.name = "required";
+    else if (name.length > LIMITS.GROUP_NAME_MAX) errors.name = "too_long";
+
+    if (!errors.name) {
+        const wanted = foldText(name);
+        if ((existingNames ?? []).some((other) => foldText(other) === wanted)) {
+            errors.name = "duplicate_group";
+        }
+    }
+
+    return { ok: Object.keys(errors).length === 0, errors, values: { name } };
 }
 
 /* --------------------------------- assert -------------------------------- */

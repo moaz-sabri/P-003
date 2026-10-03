@@ -18,7 +18,7 @@ import { deriveAll, envelopeOf, authHeaders, authKeyHex } from "./crypto-service
 import { CryptoError } from "../domain/errors.js";
 import { createSecretKey, decodeSecretKey, formatSecretKey, SECRET_KEY_LENGTH } from "../domain/secret-key.js";
 import { IDENTITY_VERSION } from "../config.js";
-import { getIdentityEnvelope, saveIdentityEnvelope, clearIdentityEnvelope } from "../data/repos.js";
+import { getIdentityEnvelope, saveIdentityEnvelope, clearIdentityEnvelope } from "../data/repo-core.js";
 import { deleteDb } from "../data/db.js";
 
 /** The derived keys for this device, or null. Never written anywhere. */

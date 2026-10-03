@@ -532,21 +532,127 @@ dialog::backdrop {
     background: var(--bad-soft);
 }
 
-/* One answer's controls: the text box, whether it is correct, and the button
- * that removes it. `flex: 1` on the box and `flex: 0 0 auto` on the two buttons is
- * what makes the row wrap in the right order — the box takes the first line on
- * its own at 320px, and the two buttons share the second, rather than one button
- * being pushed off the edge. */
-.option-row {
+/* The option's position, written down rather than remembered.
+ *
+ * "الخيارات غير ثابتة في ترتيبها" was a real bug and this is the fix's other
+ * half: the options are now ALWAYS shown in the order they were typed, and this
+ * badge says what that order is. A reader who is checking a question against a
+ * book, or marking it against a colleague's copy, needs to be able to say
+ * "the third one" and have that mean the same thing on two devices — which it
+ * cannot when the row order is a hash of the question id.
+ *
+ * It is a number and not a bullet because the exercise page and the editor are
+ * the same list seen twice, and a reader comparing them needs the same word for
+ * the same row. */
+.option-index {
+    flex: 0 0 auto;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.option[aria-pressed="true"] .option-index,
+.option[data-state="correct"] .option-index {
+    background: var(--surface);
+    border-color: currentColor;
+}
+
+/* One answer in the EDITOR: the number, the text box, whether it is the answer,
+ * and the button that removes it.
+ *
+ * THE ROW ITSELF IS TINTED WHEN THE OPTION IS CORRECT. This is the fix for a
+ * bug that made the answer key invisible: the control that marked an option as
+ * correct was a plain button whose ONLY state change was `aria-pressed`, and
+ * there is no selector in the stylesheet for `aria-pressed` on a button — only on
+ * `.option`, which is the exercise page's answer row. So a reader could mark
+ * four options as the answer, see four buttons that all looked exactly the same,
+ * save, and never be told which of the four the app had stored.
+ *
+ * Four cues now, and all four are needed: the row's tint, a real checkbox the
+ * platform draws, a ✓ inside it, and the word on the control. Colour alone would
+ * fail a reader who cannot see it, the checkbox alone is a 20px target, and the
+ * word alone is invisible once a row wraps. */
+.option-edit {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
 }
 
-.option-row > .input {
+.option-edit[data-correct="true"] {
+    border-color: var(--ok);
+    background: var(--ok-soft);
+}
+
+.option-edit > .input {
     flex: 1 1 9rem;
     min-width: 0;
+}
+
+.option-correct {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.option-edit[data-correct="true"] .option-correct {
+    border-color: var(--ok);
+    color: var(--ok);
+    font-weight: 600;
+}
+
+/* The checkbox itself is `appearance: none` so the platform's tick can be
+ * replaced by one this app controls — the native control is a different size and
+ * a different shape in every engine, and the mark has to sit in the same place as
+ * the number badge beside it. */
+.option-correct input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+
+.option-correct input[type="checkbox"]:checked {
+    border-color: var(--ok);
+    background: var(--ok);
+}
+
+.option-correct input[type="checkbox"]:checked::after {
+    content: "✓";
+    color: var(--accent-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .option-remove {
@@ -564,6 +670,64 @@ dialog::backdrop {
 
 .row-delete:hover {
     color: var(--bad);
+}
+
+/* --------------------------------- chips --------------------------------- */
+
+/* A wrapping row of filters: one chip per group, plus "All".
+ *
+ * LINKS, NOT BUTTONS, because a filter is a place on the screen and a reader who
+ * picks one then presses Back expects to be where they were. A chip is also a link
+ * to a URL that means the same thing, which is what makes a filtered question list
+ * shareable and bookmarkable — and what makes the nav bar's "you are here" mark
+ * work on it, since the path is the same one either way.
+ *
+ * `min-width` rather than `height` on the target: the chip is as tall as its
+ * padding, which is the same target size the rest of the app uses, and it wraps
+ * rather than scrolling sideways on a 320px screen with nine groups. */
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+/* The current filter. `[aria-current]` and not a class, because the thing that
+ * makes a chip current is that it is where you are — and the questions list is not
+ * the only page that draws one. */
+.chip[aria-current="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* A `<select>` used as a picker rather than as a form field — the goal switcher in
+ * a page head, and the "which goal do you want to exercise" question. Sized to its
+ * content rather than to the row, because it sits beside a button and a select that
+ * fills the row pushes the button off a 320px screen. */
+.select.picker {
+    width: auto;
+    max-width: 14rem;
+    min-height: 44px;
 }
 
 /* The running state of an exercise: how many questions are left, and how many

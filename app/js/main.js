@@ -32,9 +32,14 @@ import { render as identityScreen } from "./ui/identity-screen.js";
 
 import { render as home } from "./ui/pages/home.js";
 import { render as goal } from "./ui/pages/goal.js";
+import { render as goalView } from "./ui/pages/goal-view.js";
+import { render as goalContent } from "./ui/pages/goal-content.js";
+import { render as archive } from "./ui/pages/archive.js";
 import { render as questions } from "./ui/pages/questions.js";
 import { render as questionEdit } from "./ui/pages/question-edit.js";
+import { render as groups, renderGroup } from "./ui/pages/groups.js";
 import { render as exercise } from "./ui/pages/exercise.js";
+import { render as exerciseBuild } from "./ui/pages/exercise-build.js";
 import { render as result } from "./ui/pages/result.js";
 import { render as reports } from "./ui/pages/reports.js";
 import { render as settings } from "./ui/pages/settings.js";
@@ -50,7 +55,17 @@ import { render as notFound } from "./ui/pages/not-found.js";
  *  handler would be worse. */
 const PAGES = {
     home,
+    // `/goal` with no id is the list-and-create page; with an id it is that one
+    // goal. Two handlers rather than one page branching on `params`, because the
+    // two have nothing in common but the heading and a branching page grows a
+    // branch for every future difference.
     goal,
+    "goal-view": (ctx) => goalView(ctx),
+    // What a goal draws on. It is its own screen rather than a section of the goal
+    // page because the picker lists every question on the device, and four hundred
+    // rows do not belong inside a page whose subject is one goal's four numbers.
+    "goal-content": (ctx) => goalContent(ctx),
+    archive,
     questions,
     // Both question paths are the same page and the same handler. The difference
     // between "add" and "edit" is whether the matched route carries an id, and
@@ -59,8 +74,16 @@ const PAGES = {
     // and the page then read `params` from whichever it was given.
     "question-new": (ctx) => questionEdit(ctx),
     "question-edit": (ctx) => questionEdit(ctx),
-    exercise,
-    result,
+    // Same arrangement: the group list, and one group.
+    groups,
+    "group-view": (ctx) => renderGroup(ctx),
+    // RUNNING an exercise. The id is in the path and is required; there is no
+    // handler for a bare `/exercise`, because choosing which goal to act on is a
+    // decision the goal page makes from `domain/goal-action.js` and this screen has
+    // nothing to add to it.
+    exercise: (ctx) => exercise(ctx),
+    "exercise-build": (ctx) => exerciseBuild(ctx),
+    result: (ctx) => result(ctx),
     reports,
     settings
 };

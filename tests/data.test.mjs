@@ -13,7 +13,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import {
     ALL_STORES,
@@ -34,20 +34,75 @@ import { DB_VERSION as CONFIG_DB_VERSION, IDENTITY_VERSION } from "../app/js/con
  */
 function buildSchema() {
     const stores = new Map();
+
+    const handle = (name) => {
+        const store = stores.get(name);
+        assert.ok(store, `a migration reached for store ${name}, which does not exist`);
+        return {
+            createIndex(indexName, keyPath) {
+                assert.ok(!store.indexes.has(indexName), `index ${indexName} on ${name} is created twice`);
+                store.indexes.set(indexName, Array.isArray(keyPath) ? keyPath.join(",") : keyPath);
+            },
+            // Migration 5 is the first step to REMOVE an index, because it is the
+            // first step in which a field a composite index was built on stops
+            // existing. A composite index over a field the record no longer has
+            // matches nothing, and an index that quietly matches nothing is the worst
+            // of the two failures available here: the read after it returns an empty
+            // list rather than raising, so it looks like a reader with no questions.
+            // The stub enforces that the index being removed exists, because a
+            // `deleteIndex` for an index no migration created is a typo that would
+            // otherwise be invisible in every environment.
+            deleteIndex(indexName) {
+                assert.ok(store.indexes.has(indexName),
+                    `index ${indexName} is deleted from ${name} but no migration created it`);
+                store.indexes.delete(indexName);
+            },
+            // Migration 5 reads every store and rewrites every row from inside the
+            // upgrade, so the stub has to answer requests as well as record the
+            // schema. It answers with NO ROWS, which is the shape of a database at
+            // version 4 that has never been written to — and that is not a corner
+            // case: a reader who installs this app fresh runs exactly this path, so
+            // "no rows" is the most common shape the step will ever see.
+            //
+            // The rewrites are recorded rather than applied, and the tests below assert
+            // on the schema only. What the DATA migration does to a populated database
+            // is verified separately in tests/migration5.test.mjs, which drives the step
+            // against rows — see the note there about why a schema stub cannot see it.
+            getAll() {
+                return { onsuccess: null, onerror: null, result: [] };
+            },
+            get() {
+                return { onsuccess: null, onerror: null, result: null };
+            },
+            put() {
+                return { onsuccess: null, onerror: null, result: undefined };
+            }
+        };
+    };
+
+    // The upgrade transaction `db.js` hands each step. `objectStore` resolves
+    // against the stores that exist NOW, which is what makes a step that adds an
+    // index to an existing store distinguishable from one that creates it: the
+    // first has to go through here, and `createObjectStore` on a name that already
+    // exists would rebuild the store and drop every row on the device.
+    const tx = { objectStore: handle };
+
     const db = {
         createObjectStore(name, options) {
             assert.ok(!stores.has(name), `store ${name} is created twice in one migration`);
             const indexes = new Map();
             stores.set(name, { keyPath: options?.keyPath ?? null, indexes, autoIncrement: options?.autoIncrement ?? false });
-            return {
-                createIndex(indexName, keyPath) {
-                    assert.ok(!indexes.has(indexName), `index ${indexName} on ${name} is created twice`);
-                    indexes.set(indexName, Array.isArray(keyPath) ? keyPath.join(",") : keyPath);
-                }
-            };
-        }
+            return handle(name);
+        },
+        // A step that reaches for `db.transaction` instead of the transaction it was
+        // given throws `InvalidStateError: A version change transaction is running`,
+        // in every browser, on every install including a fresh one — so the stub has
+        // no `transaction` at all, and a migration that uses it fails here with a
+        // message about the schema rather than about IndexedDB's one rule.
+        transaction: undefined
     };
-    for (const step of MIGRATIONS) step.apply(db);
+
+    for (const step of MIGRATIONS) step.apply(db, tx);
     return stores;
 }
 
@@ -61,7 +116,16 @@ test("the registry and the migration create the same stores, in the same order",
     // Order matters only in that a schema is built in it; the deeper reason to
     // keep the two lists identical is that ALL_STORES is what a "delete
     // everything" path and the export path iterate.
-    assert.deepEqual(ALL_STORES.slice(0, 6), SYNCED_STORES, "the synced stores are not the first six");
+    //
+    // The synced stores are the ones the sync layer iterates and the export path
+    // includes, and they are all but the two local ones — but "the first N" is
+    // not that rule, and writing it as a prefix means the next local store breaks
+    // a test for the wrong reason. So it is checked as a set.
+    assert.deepEqual(
+        ALL_STORES.filter((name) => name !== STORE.META && name !== STORE.KEYS).sort(),
+        [...SYNCED_STORES].sort(),
+        "the synced stores and the local ones have drifted"
+    );
 });
 
 test("the schema version in config.js is the one the migrations reach", () => {
@@ -89,6 +153,38 @@ test("every synced record is keyed by id, and meta by key", () => {
     assert.equal(SCHEMA.get(STORE.KEYS).indexes.get("version"), "version");
 });
 
+test("the goal/question and goal/group ownership columns are gone, and a join table replaced them", () => {
+    // THE CENTRAL ASSERTION OF THIS VERSION, and the one that fails if somebody
+    // later adds a `goalId` back to a question or a group because some read wanted
+    // one.
+    //
+    // The four things are meant to be independent: a goal does not own questions, a
+    // group is a shelf rather than a goal's classification, and the only thing that
+    // relates a goal to a question or a group is a row in `goalRefs`. A `goalId`
+    // column on either of them reintroduces exactly the coupling the join table
+    // removed — a question that cannot exist without a goal, and a shelf that only
+    // one goal can use.
+    for (const name of [STORE.QUESTIONS, STORE.GROUPS]) {
+        for (const index of ["goalId", "goalOrder"]) {
+            assert.ok(!SCHEMA.get(name).indexes.has(index),
+                `${name} still has a ${index} index; a goal must not own this store`);
+        }
+    }
+    assert.equal(STORE.GOAL_REFS, "goalRefs");
+    const refs = SCHEMA.get(STORE.GOAL_REFS);
+    assert.ok(refs, "the goalRefs join table does not exist");
+    // Both directions, because both are read: the goal page lists a goal's
+    // references, and the group page has to answer "which goals use this shelf"
+    // without reading every goal on the device.
+    assert.equal(refs.indexes.get("goalOrder"), "goalId,order");
+    assert.equal(refs.indexes.get("ref"), "refType,refId");
+
+    // And a question still has an order, because there is still one question list —
+    // it is just a device-wide one now rather than one per goal.
+    assert.equal(SCHEMA.get(STORE.QUESTIONS).indexes.get("order"), "order");
+    assert.equal(SCHEMA.get(STORE.GROUPS).indexes.get("order"), "order");
+});
+
 test("every query in the registry is an index the migration actually creates", () => {
     for (const [name, query] of Object.entries(QUERIES)) {
         const store = SCHEMA.get(query.store);
@@ -111,19 +207,32 @@ test("every index a repository reads is in the schema, and none is missing", () 
     // Scanned out of the source rather than maintained by hand, because a second
     // list of index names is a second thing to forget. `db.byIndex(STORE.X, "y")`
     // is the only way a repository reads by anything but primary key.
-    const source = read("../app/js/data/repos.js");
+    //
+    // EVERY `repo-*.js` MODULE, and that list is read from the directory rather than
+    // written out here. The repositories used to be one file; they are five now, one
+    // per store, and a hard-coded list of five names would be a list that silently
+    // stops covering the sixth file when somebody adds one — which is the exact class
+    // of bug this test exists for, reproduced by the test that was supposed to prevent
+    // it. `readdirSync` over `app/js/data` cannot go stale.
+    const sources = readdirSync(new URL("../app/js/data/", import.meta.url))
+        .filter((name) => /^repo-.*\.js$/.test(name))
+        .map((name) => read(`../app/js/data/${name}`));
+
     const used = new Set();
-    for (const match of source.matchAll(/byIndex\(\s*STORE\.(\w+)\s*,\s*"([^"]+)"/g)) {
-        const store = STORE[match[1]];
-        assert.ok(store, `repos.js reads STORE.${match[1]}, which is not in the store registry`);
-        used.add(`${store}.${match[2]}`);
+    for (const source of sources) {
+        for (const match of source.matchAll(/byIndex\(\s*STORE\.(\w+)\s*,\s*"([^"]+)"/g)) {
+            const store = STORE[match[1]];
+            assert.ok(store, `a repository reads STORE.${match[1]}, which is not in the store registry`);
+            used.add(`${store}.${match[2]}`);
+        }
     }
+    assert.ok(sources.length >= 5, `only ${sources.length} repository modules were found; the scan is probably wrong`);
     assert.ok(used.size >= 10, `only ${used.size} index reads were found; the scan is probably wrong`);
 
     for (const key of used) {
         const [store, index] = key.split(".");
         assert.ok(SCHEMA.get(store)?.indexes.has(index),
-            `repos.js reads ${key}, which no migration creates`);
+            `a repository reads ${key}, which no migration creates`);
     }
 
     // And the reverse, for the indexes a reader would expect to be there: every
@@ -179,14 +288,19 @@ test("the meta keys are all the keys anything writes", () => {
 
 test("the sync bookkeeping fields are the five the whole app agrees on", () => {
     // updatedAt, rev, device, dirty, deletedAt. They travel with every synced
-    // record and are written by repos.touch() and read by the sync merge; a
+    // record and are written by repo-core's `touch()` and read by the sync merge; a
     // rename in one file and not the other is a record that never becomes clean.
     assert.deepEqual(COMMON_FIELDS, ["updatedAt", "rev", "device", "dirty", "deletedAt"]);
-    const repos = read("../app/js/data/repos.js");
+    // Read across every repository module, because `touch` is the only writer and it
+    // lives in repo-core while the readers are spread across the other four.
+    const repos = readdirSync(new URL("../app/js/data/", import.meta.url))
+        .filter((name) => /^repo-.*\.js$/.test(name))
+        .map((name) => read(`../app/js/data/${name}`))
+        .join("\n");
     for (const field of COMMON_FIELDS) {
-        assert.ok(repos.includes(field), `repos.js never mentions ${field}`);
+        assert.ok(repos.includes(field), `no repository module ever mentions ${field}`);
     }
     // `dirty` is 0 or 1 and never a boolean, because it goes into the API's
     // integer column; the PHP side refuses anything else, so the two must agree.
-    assert.ok(/dirty:\s*[01]/.test(repos) || repos.includes("dirty"), "no dirty flag is written");
+    assert.ok(/dirty:\s*[01]/.test(repos), "no dirty flag is written as 0 or 1");
 });

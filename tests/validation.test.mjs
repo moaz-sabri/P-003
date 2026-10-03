@@ -16,6 +16,7 @@ import {
     assertValid,
     cleanText,
     foldText,
+    validateGroup,
     validateGoal,
     validateQuestion
 } from "../app/js/domain/validation.js";
@@ -269,4 +270,51 @@ test("a missing draft is a failure, not a crash", () => {
     assert.equal(validateGoal().ok, false);
     assert.equal(validateQuestion().ok, false);
     assert.doesNotThrow(() => validateQuestion({ options: null }));
+});
+/* --------------------------------- group ---------------------------------- */
+
+test("a group needs a name", () => {
+    assert.equal(validateGroup({}).errors.name, "required");
+    assert.equal(validateGroup({ name: "   " }).errors.name, "required");
+    assert.equal(validateGroup().ok, false, "a missing draft must be a failure, not a crash");
+    assert.equal(validateGroup({ name: "  Verbs  " }).ok, true);
+});
+
+test("a group name that is too long for a chip is refused", () => {
+    const long = "x".repeat(LIMITS.GROUP_NAME_MAX + 1);
+    assert.equal(validateGroup({ name: long }).errors.name, "too_long");
+    assert.equal(validateGroup({ name: "x".repeat(LIMITS.GROUP_NAME_MAX) }).ok, true);
+});
+
+test("two groups on the device cannot share a name", () => {
+    // Two chips both reading "Verbs" on the filter row above a session are
+    // indistinguishable, so the second is refused at the point it is created rather
+    // than discovered later as a session containing questions from both.
+    //
+    // "ON THE DEVICE" IS THE CHANGE, and it is a consequence of a group no longer
+    // belonging to a goal. Uniqueness used to be checked against the names in one
+    // goal's list, which is only correct while a group is a goal's private
+    // classification. Now that one shelf can serve three goals, two goals may each
+    // have had a "Verbs" and they are genuinely different rows — and refusing the
+    // second would stop a reader from filing their Arabic verbs on a shelf of the
+    // same name without disturbing their French one. The list passed in is whatever
+    // exists, and the service passes the whole device's.
+    assert.equal(validateGroup({ name: "Verbs" }, ["Verbs"]).errors.name, "duplicate_group");
+    assert.equal(validateGroup({ name: "Verbs" }, ["Nouns"]).ok, true);
+    // And an empty device, or one whose only group is this one being renamed, both
+    // leave the name available.
+    assert.equal(validateGroup({ name: "Verbs" }, []).ok, true);
+});
+
+test("a group's name is compared folded, like its options and its goal title", () => {
+    // The same Arabic name typed in a second hamza form is not a second group, for
+    // the same reason a question cannot have two options that say the same thing.
+    assert.equal(
+        validateGroup({ name: "�����" }, ["�����"]).errors.name,
+        "duplicate_group",
+        "ta marbuta and ha were treated as different names"
+    );
+    // And so is a name that differs only in case or in the spaces inside it.
+    assert.equal(validateGroup({ name: "verbs" }, ["Verbs"]).errors.name, "duplicate_group");
+    assert.equal(validateGroup({ name: "Big verbs" }, ["big   verbs"]).errors.name, "duplicate_group");
 });

@@ -8,7 +8,7 @@
 // release, which is the bug that file's first comment is about.
 
 export const DB_NAME = "recall";
-export const DB_VERSION = 1;
+export const DB_VERSION = 5;
 export const APP_NAME = "Recall";
 export const APP_VERSION = "1.0.0";
 
@@ -47,6 +47,72 @@ export const DEFAULT_DURATION_DAYS = 90;
 
 /** How long before a backup file is considered stale, in days. */
 export const BACKUP_REMINDER_DAYS = 30;
+
+/* -------------------------------------------------------------------------- */
+/*                                   exercises                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many exercises one goal may START inside a rolling window, and how long
+ * that window is.
+ *
+ * THE CAP IS ON THE RATE, NOT ON HOW MANY MAY BE OPEN. It used to be one open
+ * exercise at a time, which meant a reader who wanted to work through two sessions
+ * in one evening could not, and the only feedback was a button that would not
+ * press. Several exercises may now be open at once; what is bounded is how fast
+ * new ones can be started, which is the thing that actually protects a reader
+ * from queueing forty sessions they will never reach.
+ *
+ * THREE IN TWO DAYS. Two is a real number rather than a round one, and it is the
+ * smallest number that lets a reader finish a session on one evening and start the
+ * next one after a day off — which is what `DEFAULT_INTERVAL_DAYS = 1` already
+ * invites them to do. A cap of one would contradict the interval it sits beside.
+ */
+export const MAX_EXERCISES_PER_WINDOW = 3;
+
+/** The window those three are counted over. A SLIDING window, not a calendar day:
+ *  a calendar reset hands out five sessions to a reader who finished one at 23:50
+ *  and started four at 00:05, which is the opposite of what the number is for. */
+export const EXERCISE_WINDOW_DAYS = 2;
+
+/* -------------------------------------------------------------------------- */
+/*                              goals and exercises                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Whether a goal may be closed while exercises of its own are still open.
+ *
+ * `false`, and it is a rule rather than a consequence. An open exercise belongs to
+ * its goal's history: the report of that goal is where its attempts are counted
+ * and where its questions were drawn from. Closing the goal would move the goal's
+ * questions out of reach — "the question is not deleted with the goal" is the
+ * rule this app now follows — while leaving the exercise behind with nowhere to
+ * be resumed, so a reader halfway through would have to either abandon it or
+ * reopen a goal they had finished on purpose.
+ *
+ * Archiving is the answer for a goal with open exercises, and it costs nothing:
+ * the goal keeps its questions, its exercises and its report, and no new exercise
+ * is built.
+ */
+export const CLOSE_REQUIRES_NO_OPEN_EXERCISES = true;
+
+/**
+ * Whether an exercise may be repeated on demand, with the same questions.
+ *
+ * `true`, and it is the default because "غلق بالاضافة، ويمكن إعادة التمرين بنفس
+ * الكلمات متى شئت" is a requirement rather than a feature to be weighed. An
+ * exercise is a set of questions, not a scarce event: a reader who wants to run
+ * the same twenty questions again on Sunday has said something about how they
+ * want to revise, and an app that says "come back in 14 days" has refused to read
+ * it.
+ *
+ * A repeat is a NEW exercise with the SAME items — its own attempt log, its own
+ * score, its own entry in the report. Re-opening the old record instead would
+ * append the second sitting to the first one's log, so the exercise would show a
+ * score over both and a first-try figure the reader cannot get back, which is the
+ * one number on the result page that means anything.
+ */
+export const EXERCISES_ARE_REPEATABLE = true;
 
 /* --------------------------------- sync --------------------------------- */
 

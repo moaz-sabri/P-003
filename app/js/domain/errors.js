@@ -42,14 +42,26 @@ export class NotFoundError extends Error {
     }
 }
 
-/** The plan says this is not the moment. Its code is the reason, so the UI can
- *  say "come back tomorrow" without knowing the rule. */
+/**
+ * The plan says this is not the moment. Its code is the reason, so the UI can say
+ * "come back tomorrow" without knowing the rule.
+ *
+ * `details` is carried for the rules whose message has to say WHEN, not just that
+ * there is a wait. The rate cap is the case: "you have started three exercises in
+ * the last two days" is useless without the hour the next slot frees, and the UI
+ * has no way to work that out from the code — the window is a domain constant, so
+ * computing it in the page would be a second copy of the rule.
+ */
 export class ScheduleError extends Error {
-    /** @param {string} code */
-    constructor(code) {
+    /**
+     * @param {string} code
+     * @param {{quota?: {used: number, limit: number, retryAt: number, windowDays: number}}} [details]
+     */
+    constructor(code, details = null) {
         super(code);
         this.name = "ScheduleError";
         this.code = code;
+        this.details = details;
     }
 }
 

@@ -41,8 +41,25 @@ export const BACKUP_FORMAT = "recall/backup";
 
 /** The layout version. Bumped when the sealed plaintext changes shape, which is
  *  the only incompatibility worth refusing a file over — a newer version means a
- *  newer derivation or a new payload, and guessing at either loses data quietly. */
-export const BACKUP_VERSION = 1;
+ *  newer derivation or a new payload, and guessing at either loses data quietly.
+ *
+ *  IT WAS BUMPED FOR THE SEPARATION, and the reason is specific rather than routine.
+ *  The `tables` map is keyed by store name and the store list comes from the CALLER,
+ *  so a version-1 file still parses and still restores — every question, every option,
+ *  every attempt comes back. What does not come back is the relationship between them:
+ *  a file made before goals stopped owning questions has no `goalRefs` table to hold
+ *  the attachments, and the `goalId` on its question rows is a field nothing reads
+ *  any more. Restoring it would produce a database where every goal has no material at
+ *  all and every question looks unattached — a silent, total loss of the thing the
+ *  reader backed up, reported as a successful restore.
+ *
+ *  Refusing the file with `backup_version` is the honest answer, and it is the answer
+ *  this mechanism already exists for. The alternative — teaching the restore path to
+ *  derive attachments from a field the next version will not have — puts a migration
+ *  inside a security boundary, and a backup that is one version behind is a support
+ *  message rather than an emergency.
+ */
+export const BACKUP_VERSION = 2;
 
 /**
  * The additional authenticated data of the sealed blob.

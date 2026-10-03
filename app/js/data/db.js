@@ -56,6 +56,15 @@ export function openDb() {
 
         request.onupgradeneeded = (event) => {
             const db = request.result;
+            // THE UPGRADE TRANSACTION IS HANDED TO EACH STEP, and that is not a
+            // convenience. Adding an index to a store that already exists means
+            // calling `createIndex` on an IDBObjectStore, and the only handle to
+            // one is `transaction.objectStore(name)` — and `db.transaction(...)`
+            // inside `onupgradeneeded` throws `InvalidStateError: A version change
+            // transaction is running`, because the connection already has one
+            // open. There is no way to add an index to a live store without this,
+            // which is why `apply` takes two arguments rather than one.
+            const tx = request.transaction;
             // Only the steps above the version the database was actually at.
             // The `event.oldVersion` guard is what makes adding version 2 safe on
             // a device that already ran version 1 — without it, step 1 would run
@@ -63,7 +72,7 @@ export function openDb() {
             for (const step of MIGRATIONS) {
                 if (step.version <= event.oldVersion) continue;
                 if (step.version > event.newVersion) break;
-                step.apply(db);
+                step.apply(db, tx);
             }
         };
 

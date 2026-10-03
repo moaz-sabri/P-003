@@ -95,9 +95,24 @@ export function numberInput({ value = "", min = null, max = null }) {
     });
 }
 
+/**
+ * A `<select>`. Each option is `{value, labelKey}` — or `{value, label}`, for the
+ * options whose text is DATA rather than a translation key.
+ *
+ * The two forms exist because the group picker and the goal picker list names the
+ * reader typed. A group called "Verbs" is not a sentence in either language, and
+ * routing it through `t()` would mean every group name had to be a key in the string
+ * tables, which is the fragmented-string problem `i18n/strings.js` exists to
+ * prevent. `labelKey` wins when both are given, so a caller that passes both by
+ * mistake gets the translation rather than a blank option.
+ */
 export function selectInput({ value, options }) {
     const node = h("select.select", null, options.map((o) =>
-        h("option", { value: String(o.value), text: t(o.labelKey), selected: String(o.value) === String(value) })
+        h("option", {
+            value: String(o.value),
+            text: o.labelKey ? t(o.labelKey) : String(o.label ?? ""),
+            selected: String(o.value) === String(value)
+        })
     ));
     node.value = String(value);
     return node;

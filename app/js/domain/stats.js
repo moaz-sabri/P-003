@@ -58,6 +58,10 @@ export function latestAttempt(attempts) {
  * nobody has established that they know it.
  */
 export function progress(questions, history) {
+    // The caller decides WHICH questions, and that is now a real decision rather
+    // than a formality: a goal's report passes the material it draws on (a join
+    // through its references), the device-wide report passes every question, and the
+    // two answer different questions on purpose.
     const { fresh, review, learned } = classifyQuestions(questions, history);
     const total = questions.length;
     const seen = review.length + learned.length;

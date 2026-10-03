@@ -45,7 +45,7 @@ require_once __DIR__ . '/db.php';
  *  deliberately excludes `meta` (which holds the sync cursor) and `keys` (which
  *  holds a non-extractable CryptoKey that must never leave a device).
  */
-const RC_STORES = ['goals', 'questions', 'options', 'exercises', 'exerciseItems', 'attempts'];
+const RC_STORES = ['goals', 'questions', 'groups', 'options', 'exercises', 'exerciseItems', 'attempts', 'goalRefs'];
 
 /** Refuses one malformed record. A 400, because it is the request that is wrong
  *  and not the network — which is why app/net.js maps it to `bad_response` and not
@@ -227,8 +227,14 @@ function rc_normalise_record(mixed $record): array
     // characters. Not `strlen` alone and not a character-class check, because an id
     // is what every other row is looked up by and a loose one is a key collision
     // waiting for a second device to invent it.
+    // Every prefix in this pattern has an entry in PREFIXES in app/js/domain/id.js,
+    // and a record whose id matches none of them is a record the client refuses to
+    // write when it comes back. `gr_` (a group) and `rf_` (a goalRef) are both in
+    // that list and both were missing here, which is why a group created on one
+    // device was counted as "refused" on the way and arrived as a question filed
+    // under a group id nothing recognised.
     if (!is_string($id)
-        || preg_match('#^(g_|q_|o_|x_|it_|a_)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#', $id) !== 1) {
+        || preg_match('#^(g_|q_|gr_|o_|x_|it_|a_|rf_)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#', $id) !== 1) {
         throw new RcBadRequest();
     }
 

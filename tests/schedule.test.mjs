@@ -17,13 +17,27 @@ import {
     goalEndsAt,
     isExpired,
     latestExercise,
+    latestFinished,
+    openExercises,
     planSchedule,
     projectedDueAt
 } from "../app/js/domain/schedule.js";
 import { addDays } from "../app/js/domain/time.js";
+import { exerciseQuota } from "../app/js/domain/exercise-builder.js";
 
 const GOAL = { id: "g1", status: "active", intervalDays: 1, newPerExercise: 5 };
 const DAY = 86400000;
+
+/** One exercise. `done` is how many days ago it was finished; `null` leaves it
+ *  open, which is the case the state machine used to get wrong. */
+const exercise = (number, { done = null, created = 30 } = {}) => ({
+    id: `e${number}`,
+    goalId: "g1",
+    number,
+    createdAt: Date.now() - created * DAY,
+    completedAt: done === null ? null : Date.now() - done * DAY,
+    deletedAt: null
+});
 
 test("a device with no goal is its own state", () => {
     // Not an absence of a goal but a state, because the home page has to say
@@ -49,11 +63,15 @@ test("a completed goal builds nothing, however old the interval is", () => {
     assert.ok(!canStartNewExercise(plan), "a completed goal offered another exercise");
 });
 
-test("an unfinished exercise wins over an elapsed interval", () => {
-    // THE test. `dueAt` is far in the past, which is what the previous exercise's
-    // interval produced; the exercise itself has no `completedAt`. Only the clock
-    // says the reader may start again, and only the state machine is allowed to
-    // answer.
+test("an open exercise is reported, and does not block a new one", () => {
+    // THE test, and it is the inverse of what it used to assert. There used to be an
+    // `IN_PROGRESS` state meaning "an exercise is open, so no second one may be
+    // built", and it made a reader who wanted to work through two sessions in one
+    // evening unable to — with the only feedback a button that would not press.
+    //
+    // An open exercise is now a FACT about the goal, reported in `plan.open`, and
+    // what bounds a reader queueing forty sessions is the rate cap rather than a
+    // lock they cannot see the reason for.
     const stale = {
         id: "e1",
         goalId: "g1",
@@ -63,9 +81,72 @@ test("an unfinished exercise wins over an elapsed interval", () => {
         completedAt: null
     };
     const plan = planSchedule({ goal: GOAL, exercises: [stale], now: Date.now() });
-    assert.equal(plan.state, SCHEDULE.IN_PROGRESS);
-    assert.equal(plan.exercise.id, "e1", "the exercise to resume is not the one that was left open");
-    assert.ok(!canStartNewExercise(plan), "a second exercise was allowed while one was open");
+    assert.equal(plan.state, SCHEDULE.READY);
+    assert.deepEqual(plan.open.map((e) => e.id), ["e1"], "the open exercise was not reported");
+    assert.ok(canStartNewExercise(plan), "an open exercise still blocks a second one");
+
+    // Several at once, newest first — a reader with three sessions in front of them
+    // has three things, and a card offering one is wrong two times out of three.
+    const three = planSchedule({
+        goal: GOAL,
+        exercises: [exercise(1), exercise(2), exercise(3)],
+        now: Date.now()
+    });
+    assert.deepEqual(three.open.map((e) => e.number), [3, 2, 1]);
+    assert.ok(canStartNewExercise(three), "three open exercises still block a fourth");
+});
+
+test("an open exercise is never the anchor for the interval", () => {
+    // The interval is measured from the last FINISHED exercise, and the newest
+    // exercise is not necessarily that one. Anchoring on the newest meant an
+    // exercise with no `completedAt` gave `dueAt = 0`, so the goal never waited —
+    // and a reader with one abandoned session and a one-day interval could start a
+    // new exercise every time they opened the app.
+    const abandoned = planSchedule({
+        goal: GOAL,
+        exercises: [exercise(2, { done: 0.5, created: 3 }), exercise(3)],
+        now: Date.now()
+    });
+    assert.equal(abandoned.state, SCHEDULE.WAITING,
+        "the goal waited on nothing and offered an exercise a minute after one was finished");
+    assert.equal(abandoned.exercise.number, 2, "the interval was measured from the open exercise");
+    assert.deepEqual(abandoned.open.map((e) => e.number), [3],
+        "the open exercise was lost while the finished one anchored the interval");
+
+    // And with only an open exercise there is nothing to count from, so the goal is
+    // ready — which is right, and is what the rule above depends on.
+    const onlyOpen = planSchedule({ goal: GOAL, exercises: [exercise(1)], now: Date.now() });
+    assert.equal(onlyOpen.state, SCHEDULE.READY);
+    assert.equal(latestFinished([exercise(1)]), null);
+});
+
+test("the cap is what refuses, and it is the caller's quota", () => {
+    // The cap is over the whole DEVICE, so it cannot be derived from this goal's
+    // exercises and `planSchedule` takes it as an argument. A goal with three fresh
+    // exercises of its own and no quota offered is READY; the same three passed
+    // through the cap is RATE_LIMITED.
+    const three = [exercise(1, { created: 0.2 }), exercise(2, { created: 0.6 }), exercise(3, { created: 1.1 })];
+    assert.equal(planSchedule({ goal: GOAL, exercises: three }).state, SCHEDULE.READY);
+
+    const blocked = planSchedule({ goal: GOAL, exercises: three, quota: exerciseQuota(three) });
+    assert.equal(blocked.state, SCHEDULE.RATE_LIMITED);
+    assert.ok(!canStartNewExercise(blocked));
+    assert.ok(blocked.quota.retryAt > 0, "a refusal with no date to wait for");
+    // The open ones are still reported: being over the cap says nothing about the
+    // sessions already in progress.
+    assert.deepEqual(blocked.open.length, 3);
+
+    // And a quota with room does not refuse, so a stale quota from a page that was
+    // left open cannot lock a reader out of an exercise the cap has since cleared.
+    assert.equal(planSchedule({ goal: GOAL, quota: exerciseQuota([]) }).state, SCHEDULE.READY);
+});
+
+test("waiting outranks the cap, because it has a date and the cap does not need one", () => {
+    const finished = exercise(1, { done: 0 });
+    const fresh = [finished, exercise(2, { created: 0.1 }), exercise(3, { created: 0.2 }), exercise(4, { created: 0.3 })];
+    const plan = planSchedule({ goal: GOAL, exercises: fresh, quota: exerciseQuota(fresh) });
+    assert.equal(plan.state, SCHEDULE.WAITING,
+        "the cap was shown where the goal's own interval had the clearer answer");
 });
 
 test("the interval is measured from when the exercise was FINISHED", () => {
@@ -106,15 +187,28 @@ test("the newest exercise is chosen by number, not by creation time", () => {
 
 test("a deleted goal exercises list can still be READY", () => {
     // Deleting every exercise is not something the UI offers, but a sync tombstone
-    // can do it, and the state must not become IN_PROGRESS with `exercise: null` —
-    // the exercise page dereferences that.
+    // can do it, and the state must not be a resume pointing at nothing — the
+    // exercise page reads `plan.open`, and an empty list is the honest answer.
     const plan = planSchedule({
         goal: GOAL,
         exercises: [{ id: "e1", number: 1, completedAt: null, deletedAt: 12 }],
         now: Date.now()
     });
     assert.equal(plan.state, SCHEDULE.READY);
+    assert.deepEqual(plan.open, []);
     assert.equal(plan.exercise, undefined);
+});
+
+test("openExercises skips tombstones and orders by number", () => {
+    const rows = [
+        { id: "gone", number: 9, completedAt: null, deletedAt: 1 },
+        { id: "done", number: 8, completedAt: Date.now() },
+        { id: "two", number: 2, completedAt: null },
+        { id: "one", number: 1, completedAt: null }
+    ];
+    assert.deepEqual(openExercises(rows).map((e) => e.id), ["two", "one"]);
+    assert.deepEqual(openExercises(null), []);
+    assert.equal(latestFinished(rows).id, "done");
 });
 
 test("the unlock is measured from when the exercise FINISHED", () => {
@@ -215,4 +309,37 @@ test("projectedDueAt is only ever a hint", () => {
     assert.equal(projectedDueAt(3, from), addDays(from, 3));
     assert.equal(projectedDueAt(0, from), addDays(from, 1));
     assert.equal(projectedDueAt(undefined, from), addDays(from, 1));
+});
+test("an archived goal builds nothing, however fresh its interval is", () => {
+    // Archiving is the READER putting a goal away, and it is a state of its own
+    // rather than a flavour of "finished": a finished goal is over, and this one is
+    // reversible -- `unarchiveGoal` sets `archivedAt` back to null and the goal
+    // builds again. Reporting it as `completed` would tell somebody who had only
+    // filed a goal away that they had finished it.
+    const goal = { ...GOAL, archivedAt: Date.now() };
+    const plan = planSchedule({ goal, exercises: [] });
+    assert.equal(plan.state, SCHEDULE.ARCHIVED);
+    assert.ok(!canStartNewExercise(plan), "an archived goal offered another exercise");
+
+    // And it is its own state even on a goal that is ALSO completed, because the
+    // reader's instruction is the one that answers "may anything new be built".
+    const both = planSchedule({
+        goal: { ...goal, status: "completed" },
+        exercises: [],
+        now: Date.now()
+    });
+    assert.equal(both.state, SCHEDULE.COMPLETED,
+        "finishing must still outrank archiving so a finished goal reads as finished");
+});
+
+test("an archived goal with open exercises is not resumed either", () => {
+    const open = { id: "e1", number: 1, completedAt: null };
+    const plan = planSchedule({
+        goal: { ...GOAL, archivedAt: Date.now() },
+        exercises: [open],
+        now: Date.now()
+    });
+    assert.equal(plan.state, SCHEDULE.ARCHIVED);
+    assert.equal(plan.exercise, undefined,
+        "the archived goal handed back an exercise to resume");
 });

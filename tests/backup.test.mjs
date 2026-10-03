@@ -183,6 +183,23 @@ test("the header is checked before anything is decrypted", () => {
 test("a backup from another version is refused rather than guessed at", () => {
     const future = { format: BACKUP_FORMAT, version: BACKUP_VERSION + 1, spaceId: "S", data: { body: "x" } };
     assert.throws(() => readBackupHeader(future, "S"), (e) => e.code === "backup_version");
+
+    // AND THE PAST IS REFUSED TOO, which is the half that matters for this change.
+    //
+    // A version-1 file has no `goalRefs` table, so restoring it into the separated
+    // schema would bring back every question and every attempt and no relationships at
+    // all: every goal with no material, every question apparently unattached, and a
+    // restore dialog reporting success. The `tables` map is keyed by store name and
+    // read against the caller's list, so nothing about the file's SHAPE would stop it —
+    // which is exactly why the version has to.
+    const past = { format: BACKUP_FORMAT, version: BACKUP_VERSION - 1, spaceId: "S", data: { body: "x" } };
+    assert.throws(() => readBackupHeader(past, "S"), (e) => e.code === "backup_version",
+        "a pre-separation backup was accepted, and would restore with no attachments");
+
+    // And the version is the second one, so this test fails if it is bumped without the
+    // reasoning above being revisited — a bare bump that keeps passing is a bump nobody
+    // checked, and the file it refuses is somebody's only copy of their material.
+    assert.equal(BACKUP_VERSION, 2);
 });
 
 test("another person's backup is refused, and it is refused before the key is tried", () => {

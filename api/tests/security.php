@@ -151,13 +151,61 @@ rc_test('an auth key must be 64 lower-case hex characters', function (): void {
     rc_assert(!rc_is_auth_key(''), 'an empty key is accepted');
 });
 
-rc_test('the store list is the six synced stores and nothing else', function (): void {
+rc_test('the store list is the eight synced stores and nothing else', function (): void {
     // Mirrors SYNCED_STORES in app/js/data/stores.js. `meta` and `keys` must
     // never appear: the first holds the sync cursor, the second a CryptoKey.
+    //
+    // `groups` is in here because a question's group travels with it. A question
+    // that arrived without the group it belongs to would be a question filed
+    // nowhere, on the device that synced it — which is precisely the state groups
+    // were added to get rid of, arriving again through the server instead.
+    //
+    // `goalRefs` is in here for the same reason and more sharply: it is the ONLY
+    // thing that says a goal draws on a group or on a question, so a goalRefs row
+    // that stops here is a goal that silently loses a shelf on the other device. It
+    // cannot be re-derived on arrival — there is nothing on the other side to derive
+    // it from — which is exactly why it is a store rather than a join done at read
+    // time.
     rc_assert_same(
-        ['goals', 'questions', 'options', 'exercises', 'exerciseItems', 'attempts'],
+        ['goals', 'questions', 'groups', 'options', 'exercises', 'exerciseItems',
+            'attempts', 'goalRefs'],
         RC_STORES,
         'the store list drifted from the client'
+    );
+});
+
+rc_test('every synced store has its id prefix accepted, including the two that were missing', function (): void {
+    // The id pattern in sync.php and the PREFIXES map in app/js/domain/id.js are two
+    // copies of one fact in two languages, and they disagreed: `gr_` and `rf_` were
+    // in PREFIXES and not in the pattern. A group or a reference row whose id the
+    // pattern refuses is refused on push AND is not in the id check on the way back,
+    // so it vanished between two devices with no error on either side.
+    //
+    // This asserts the shape rather than the pattern string, so renaming a prefix in
+    // one language and forgetting the other fails here instead of on a reader's
+    // second phone.
+    $code = file_get_contents(__DIR__ . '/../sync.php');
+    rc_assert(strpos($code, 'RC_STORES') !== false, 'sync.php does not declare RC_STORES');
+
+    foreach (['g_', 'q_', 'gr_', 'o_', 'x_', 'it_', 'a_', 'rf_'] as $prefix) {
+        rc_assert(
+            strpos($code, $prefix) !== false,
+            "the id pattern in sync.php does not accept the {$prefix} prefix"
+        );
+    }
+    // And the shape, from a real id per prefix, through the real check.
+    $uuid = '0f7c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b';
+    rc_assert(
+        preg_match('#^(g_|q_|gr_|o_|x_|it_|a_|rf_)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#', 'gr_' . $uuid) === 1,
+        'a group id is refused'
+    );
+    rc_assert(
+        preg_match('#^(g_|q_|gr_|o_|x_|it_|a_|rf_)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#', 'rf_' . $uuid) === 1,
+        'a goalRef id is refused'
+    );
+    rc_assert(
+        preg_match('#^(g_|q_|gr_|o_|x_|it_|a_|rf_)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#', 'zz_' . $uuid) !== 1,
+        'an id with an unregistered prefix is accepted'
     );
 });
 

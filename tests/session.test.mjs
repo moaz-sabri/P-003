@@ -1,13 +1,20 @@
-// Running an exercise, and the promise that a dead tab changes nothing.
+// Running a session, and the two promises that make it safe.
 //
-// The whole of this module is an argument that a session does not have to be
-// stored: an attempt log is enough to rebuild it exactly. That argument only
-// holds if `resumeSession` reproduces `advance` step for step, which is what the
-// tests below pin down by running the same answers through both paths and
-// comparing. If the two ever disagree, an exercise that was interrupted resumes in
-// a state no sequence of answers could have produced — which shows up as a reader
-// being asked a question they have already answered in this exercise, or as an
-// exercise page with nothing on it and no Next button.
+// THE FIRST is the one this file has always made: a session does not have to be
+// stored. An attempt log is enough to rebuild it exactly, which only holds if
+// `resumeSession` reproduces `advance` step for step — so the tests below run the
+// same answers through both paths and compare. If the two ever disagree, a session
+// that was interrupted resumes in a state no sequence of answers could have
+// produced: a reader asked a question they already answered, or a page with nothing
+// on it and no Next button.
+//
+// THE SECOND is new, and it is the snapshot rule. An item carries its own copy of the
+// question — the text, the kind, the options and their correct marks — so what a
+// session asks cannot change after it starts. The tests at the bottom hold that: a
+// question edited between two items, or deleted outright, leaves the session exactly
+// as it was. This is the difference between "a session" and "a link to some questions",
+// and without it the promise above is not enough: a session could rebuild perfectly
+// from its log and still be asking something the reader was never shown.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -17,17 +24,35 @@ import {
     countKinds,
     currentItem,
     firstPass,
+    isDrawable,
     isFinished,
     progress,
+    questionOf,
     resumeSession,
     startSession
-} from "../app/js/domain/session-run.js";
+} from "../app/js/domain/session.js";
 import { ITEM_KIND } from "../app/js/domain/exercise-builder.js";
 
-/** The exercise's items, in the order they were built. `kind` is here because
- *  countKinds reads it; nothing else in this module does. */
+/**
+ * The session's items, in the order they were built.
+ *
+ * `kind` is here because countKinds reads it. The rest — the frozen question — is
+ * here because these are SNAPSHOT items now, and a test fixture that left the copy
+ * out would be testing a shape the app no longer produces: `questionOf` and
+ * `isDrawable` below read those fields, and the tests for them are the reason this
+ * file grew them.
+ */
 const items = (n = 3) => Array.from({ length: n }, (_, i) => ({
-    id: `i${i + 1}`, order: i, kind: i < 2 ? ITEM_KIND.NEW : ITEM_KIND.REVIEW
+    id: `i${i + 1}`,
+    order: i,
+    kind: i < 2 ? ITEM_KIND.NEW : ITEM_KIND.REVIEW,
+    questionId: `q${i + 1}`,
+    questionText: `Question ${i + 1}`,
+    questionKind: "single",
+    options: [
+        { id: `q${i + 1}-o1`, text: "right", isCorrect: true, order: 0 },
+        { id: `q${i + 1}-o2`, text: "wrong", isCorrect: false, order: 1 }
+    ]
 }));
 
 /**
@@ -384,4 +409,89 @@ test("firstPass is the score, and it is not the average of every tap", () => {
     assert.deepEqual(firstPass([], []), {
         asked: 0, correct: 0, wrong: 0, reasks: 0, percent: 100, wrongItemIds: []
     });
+});
+/* -------------------------------------------------------------------------- */
+/*                            the snapshot rule                                 */
+/* -------------------------------------------------------------------------- */
+
+// Everything above tests the QUEUE � which question is next, and when the session
+// ends. What follows tests the other half of what a session is: the questions it is
+// asking, which are inside the items and not looked up.
+
+test("an item's question comes from the item, not from the question store", () => {
+    // The item is the only input. There is no id to resolve and nothing to fetch, which
+    // is the property the whole snapshot rests on: the session page cannot ask the
+    // question store what to draw, so it cannot be surprised by what the store says.
+    const [item] = items(1);
+    const question = questionOf(item);
+    assert.equal(question.text, "Question 1");
+    assert.equal(question.kind, "single");
+    assert.equal(question.id, "q1", "the id is a hint for reports, not a lookup key");
+    assert.equal(question.options.length, 2);
+    assert.equal(question.options[0].text, "right");
+});
+
+test("the option order in the copy is the order the reader saw", () => {
+    // "The third option" has to mean the same thing in the editor, in the session, on
+    // the other device and in next week's report. The copy keeps each option's stored
+    // `order`, and `orderOptions` is the one function that sorts by it.
+    const item = {
+        questionId: "q1",
+        questionText: "Q",
+        questionKind: "multiple",
+        options: [
+            { id: "o3", text: "third", isCorrect: true, order: 2 },
+            { id: "o1", text: "first", isCorrect: false, order: 0 },
+            { id: "o2", text: "second", isCorrect: false, order: 1 }
+        ]
+    };
+    const question = questionOf(item);
+    assert.deepEqual(question.options.map((o) => o.text), ["first", "second", "third"]);
+    assert.equal(question.kind, "multiple", "a multiple-choice copy must not read as single");
+});
+
+test("an item with no frozen copy is not drawable, and says so by being empty", () => {
+    // The one item this app can produce that cannot be asked: one written before the
+    // snapshot existed. It must NOT fall back to the live question, because that is
+    // precisely the "the session changed under the reader" failure the copy prevents.
+    // Empty is the honest answer, and `isDrawable` is what `repeat` filters on.
+    const legacy = { id: "i1", questionId: "q1", kind: ITEM_KIND.NEW };
+    assert.equal(isDrawable(legacy), false);
+    assert.deepEqual(questionOf(legacy).options, []);
+    assert.equal(questionOf(legacy).text, "");
+
+    // Text with no options is just as undrawable: a question offering nothing cannot
+    // be answered, and rendering it as a question would put a Next button beside an
+    // empty list.
+    assert.equal(isDrawable({ questionText: "Q", options: [] }), false);
+    assert.equal(isDrawable({ questionText: "Q", options: [{ id: "o1", isCorrect: true }] }), true);
+});
+
+test("a question kind that is not multiple reads as single", () => {
+    // The copy is written by a builder, but it is also written by a migration, and it
+    // comes back from sync as whatever the other device stored. An unknown kind must
+    // not reach the page as `undefined` and decide its own control: a wrong-kind
+    // question that rendered as "tap one answer" when it has two correct options is a
+    // question the reader cannot answer correctly.
+    assert.equal(questionOf({ questionKind: "multiple" }).kind, "multiple");
+    assert.equal(questionOf({ questionKind: "single" }).kind, "single");
+    assert.equal(questionOf({}).kind, "single");
+    assert.equal(questionOf({ questionKind: "nonsense" }).kind, "single");
+});
+
+test("the frozen options are a copy, not the same array", () => {
+    // Structural sharing would be the cheaper implementation and the bug: the array
+    // would be the question's own, so anything that sorted or spliced it would be
+    // editing the question a later session is built from. The builder maps to a new
+    // object per option for exactly this reason, and this is the assertion that keeps
+    // somebody from "simplifying" it back.
+    const source = [{ id: "o1", text: "a", isCorrect: true, order: 0 }];
+    const item = {
+        questionId: "q1",
+        questionText: "Q",
+        questionKind: "single",
+        options: source.map((o) => ({ ...o }))
+    };
+    assert.notEqual(questionOf(item).options, source);
+    assert.notEqual(questionOf(item).options[0], source[0]);
 });
