@@ -1,38 +1,40 @@
 // When may the next exercise be started, and what happens instead.
 //
-// The rule is one sentence long — one exercise at a time, and the next one opens
-// `intervalDays` calendar days after the last one was *finished* — and everything
-// hard about it is in the two edges:
+// The rule is one sentence long — an active goal is only ever withheld by how
+// fast its exercises may be STARTED (the cap, `RATE_LIMITED`) — and the rest of
+// this file is about what that rule is NOT:
 //
-//   * AN EXERCISE THAT WAS STARTED BUT NOT FINISHED IS NOT ABANDONED. Closing the
-//     tab, locking the phone and coming back next week all leave an exercise
-//     open. If "when is the next one" only looked at the clock, it would say
-//     today is free and happily build a second exercise while half of the first
-//     one is still unanswered. So the schedule is a state machine and not a date
-//     comparison: an unfinished exercise is the answer, whatever the clock says.
-//   * "AFTER IT WAS FINISHED", not after it was created. A goal of forty
-//     questions creates exercise 1 on day 1 and, if the interval were measured
-//     from creation, exercise 2 could be due on day 1 while exercise 1 was still
-//     open. The unlock time is DERIVED HERE, from `completedAt` and the goal's own
-//     interval, and it is the same expression `summaryFor` uses — see
-//     `exerciseDueAt` for why deriving it is the only way two screens can agree.
-
-import { addDays } from "./time.js";
+//   * THERE IS NO INTERVAL. There used to be one — `intervalDays` after the
+//     last exercise was finished, with a WAITING state and an unlock date on
+//     every screen — and it is gone because the plan it belonged to is gone.
+//     The plan is a fixed ten new items plus a review of the last three
+//     exercises, whatever day it is, so an exercise finished a minute ago does
+//     not lock the goal and one from last week does not unlock it. A finished
+//     exercise ends with Continue or Stop, and there is no date to count down.
+//
+//   * THERE IS NO END DATE. A plan with a fixed length would need a way to run
+//     out (an EXPIRED state, a countdown, a goal of "90 days" — all of it gone);
+//     a plan without one ends only when the READER closes it or files it away,
+//     which is what `COMPLETED` and `ARCHIVED` are.
+//
+//   * AN EXERCISE THAT WAS STARTED BUT NOT FINISHED IS NOT AN OBSTACLE. Closing
+//     the tab, locking the phone and coming back next week all leave an exercise
+//     open. Several may be open at once; answering "may another one start?"
+//     with "finish the first one" turns something the reader did into something
+//     they are punished for. The cap is the only thing that says no, and it
+//     counts how fast exercises are STARTED, not whether one is finished.
 
 /** The states a goal's schedule can be in. `no_goal`, `goal_completed` and
  *  `goal_archived` are states rather than absences because the home page has to say
  *  something different about each of them. */
 export const SCHEDULE = {
     NO_GOAL: "no_goal",
-    /** A goal, nothing ever exercised, or the interval has elapsed. */
+    /** A goal, and the cap has room. There is no interval to wait out, so this is
+     *  the whole of "it may be exercised now". */
     READY: "ready",
-    /** An exercise is finished and its interval has not elapsed. */
-    WAITING: "waiting",
     /** The reader has started too many exercises of THIS goal too recently. Checked
-     *  AFTER `waiting`, because a goal waiting for its own interval has a date to
-     *  give the reader and the cap does not need one — the cap's date is when this
-     *  goal's oldest exercise leaves the window, and that is a real date too, but a
-     *  goal waiting for its own interval is the earlier of the two. */
+     *  on top of `ready` every time: it is the only thing that withholds an exercise
+     *  from a goal that is open. */
     RATE_LIMITED: "rate_limited",
     /** The goal is closed. History is kept; nothing new is built. */
     COMPLETED: "goal_completed",
@@ -41,12 +43,7 @@ export const SCHEDULE = {
      *  ending: an archived goal still answers every report, and the reader can take
      *  it back out. A page that drew it as "finished" would be telling the reader
      *  something had ended when they had only put it away. */
-    ARCHIVED: "goal_archived",
-    /** The plan's time is up, but the goal was not closed by the reader. Kept apart
-     *  from `completed` because the two lead to different pages: a closed goal
-     *  offers a new one because it is finished, and an expired one says the time
-     *  is up and offers to close it. Both keep every question and every report. */
-    EXPIRED: "goal_expired"
+    ARCHIVED: "goal_archived"
 };
 
 /** The last exercise of a goal — highest number, not most recently created.
@@ -81,12 +78,10 @@ export function openExercises(exercises) {
 
 /** The last exercise of a goal that was actually FINISHED, highest number.
  *
- *  This is what the interval is measured from, and it is deliberately not
- *  `latestExercise`. With several exercises open at once, "the last one" is an
- *  exercise the reader has not finished, which has no completion time to count from
- *  — so an anchor of zero, so a permanently unlocked goal, so a reader with one
- *  abandoned session and a one-day interval who could start a new exercise every
- *  time they opened the app. */
+ *  Deliberately not `latestExercise`: with several exercises open at once, "the
+ *  last one" is often an exercise the reader has not finished. This is the one
+ *  history and the result page mean by "the last time you finished an exercise".
+ */
 export function latestFinished(exercises) {
     let best = null;
     for (const e of exercises) {
@@ -94,56 +89,6 @@ export function latestFinished(exercises) {
         if (!best || e.number > best.number) best = e;
     }
     return best;
-}
-
-/**
- * When the next exercise opens: `intervalDays` calendar days after the last
- * exercise was FINISHED.
- *
- * DERIVED, NOT READ. The exercise record carries a `dueAt` written at creation
- * (`repos.createExercise`), and reading that field is what made two screens
- * disagree: the result page counted from `completedAt` and the goal's interval,
- * and the home page counted from a value frozen when the exercise was created. So
- * an exercise created Monday and finished Wednesday showed "opens in 1 day" on the
- * result page and an enabled Start button on the home page, at the same moment.
- *
- * Reading the goal's interval here rather than the stored one is the other half of
- * it. The reader is allowed to change how often they want an exercise; a value
- * frozen at creation ignores the setting they just saved, and the result page —
- * which reads the goal fresh — would say thirty days while the button said now.
- *
- * An exercise with no `completedAt` is open rather than late, so there is no
- * unlock time to report and this is never called with one; the guard is here so a
- * caller that does it anyway gets an answer rather than a date in 1970.
- */
-export function exerciseDueAt(exercise, goal) {
-    const interval = Number(goal?.intervalDays);
-    const days = Number.isFinite(interval) && interval > 0 ? Math.round(interval) : 1;
-    const anchor = exercise?.completedAt;
-    if (!Number.isFinite(anchor) || anchor <= 0) return 0;
-    return addDays(anchor, days);
-}
-
-/**
- * When the goal's own time is up: `durationDays` calendar days after it was
- * created.
- *
- * A GOAL WITH NO DURATION NEVER EXPIRES. A record written before this field
- * existed has none, and a plan whose length is unknown has not run out.
- */
-export function goalEndsAt(goal) {
-    const days = Number(goal?.durationDays);
-    if (!Number.isFinite(days) || days <= 0) return null;
-    if (!Number.isFinite(goal?.createdAt) || goal.createdAt <= 0) return null;
-    return addDays(goal.createdAt, Math.round(days));
-}
-
-/** Whether the plan's time is up. A goal the reader closed by hand is not
- *  "expired" — it is finished, and the two say different things on screen. */
-export function isExpired(goal, now = Date.now()) {
-    if (!goal || goal.status === "completed") return false;
-    const endsAt = goalEndsAt(goal);
-    return endsAt !== null && now >= endsAt;
 }
 
 /**
@@ -156,15 +101,12 @@ export function isExpired(goal, now = Date.now()) {
  * would make the pages that ask this question read a second time. The caller reads
  * it once and hands it in; this function stays a pure answer about one goal.
  *
- * @param {{goal: object|null, exercises: object[], quota?: object|null, now?: number}} input
- * @returns {{state: string, exercise?: object, open: object[], dueAt?: number,
- *            endsAt?: number, quota?: object|null}}
+ * @param {{goal: object|null, exercises: object[], quota?: object|null}} input
+ * @returns {{state: string, goal?: object, open: object[], quota?: object|null}}
  *   `open` is every exercise still in progress, newest first — a fact about the goal,
- *   reported alongside the state and never the reason one is refused. `exercise` is
- *   the last one FINISHED; `dueAt` is when the next one may start; `endsAt` is when
- *   the plan's own time is up.
+ *   reported alongside the state and never the reason one is refused.
  */
-export function planSchedule({ goal, exercises = [], quota = null, now = Date.now() }) {
+export function planSchedule({ goal, exercises = [], quota = null }) {
     if (!goal) return { state: SCHEDULE.NO_GOAL, open: [] };
     if (goal.status === "completed") return { state: SCHEDULE.COMPLETED, goal, open: [] };
     // ARCHIVED IS CHECKED BEFORE `status`, and before anything else, because it is
@@ -174,57 +116,17 @@ export function planSchedule({ goal, exercises = [], quota = null, now = Date.no
     // who put it away.
     if (goal.archivedAt) return { state: SCHEDULE.ARCHIVED, goal, open: [] };
 
-    // THE TIME BEING UP OUTRANKS EVERYTHING ELSE, INCLUDING AN OPEN EXERCISE.
-    //
-    // Not because an open exercise should be thrown away — it is not, and the
-    // reader can go back and finish it — but because the button on the home page
-    // has one meaning, and "your plan is over" is not "start another one". The
-    // order matters in the other direction too: a goal the reader closed is
-    // `COMPLETED` and never `EXPIRED`, whatever the calendar says.
-    const endsAt = goalEndsAt(goal);
-    if (endsAt !== null && now >= endsAt) {
-        return { state: SCHEDULE.EXPIRED, goal, open: [], endsAt };
-    }
-
     const open = openExercises(exercises);
-    const tail = { goal, open, endsAt: endsAt ?? undefined, quota };
+    const tail = { goal, open, quota };
 
-    // THE INTERVAL IS MEASURED FROM THE LAST FINISHED EXERCISE, and the newest
-    // exercise is not necessarily that one. It used to be `latestExercise`, and with
-    // several exercises open at once that is an exercise with no `completedAt` — so
-    // `exerciseDueAt` returned 0, the goal never waited, and a reader with one
-    // abandoned session and a one-day interval could start a new exercise every time
-    // they opened the app.
-    const finished = latestFinished(exercises);
-    if (finished) {
-        const dueAt = exerciseDueAt(finished, goal);
-        if (now < dueAt) {
-            // WAITING IS RETURNED BEFORE THE CAP IS LOOKED AT, and that ordering is the
-            // whole of what makes the two states readable. A goal waiting for its own
-            // interval has a DATE to give the reader; the cap is about how fast this
-            // goal has been worked, and a sentence about it would send them away for a
-            // window and have them meet exactly the same thing.
-            return { ...tail, state: SCHEDULE.WAITING, exercise: finished, dueAt };
-        }
-    }
-
-    // THE CAP IS CHECKED WHENEVER THE INTERVAL HAS ELAPSED, and not only on a goal that
-    // has never been finished.
-    //
-    // It used to be the last line before `READY`, reachable only when `finished` was
-    // null — so a goal whose interval had elapsed was reported READY no matter how many
-    // exercises this device had started in the last two days. Every screen then drew a
-    // live Start button over a goal the schedule would refuse, and the refusal arrived
-    // from `start()` as a toast rather than as the state the button should have been
-    // drawn from. It is the exact bug this module's own header describes happening
-    // between two screens, except both screens were reading this one function.
+    // THE CAP IS THE ONLY GATE. There used to be an interval to wait out after a
+    // finished exercise and a plan length that could run out; with both gone, an
+    // active goal that has not hit the cap is READY, no matter when it was last
+    // worked. The cap is checked last so that `open` is still reported beside a
+    // refusal — being over it says nothing about the sessions already in progress.
     if (quota?.blocked) return { ...tail, state: SCHEDULE.RATE_LIMITED };
 
-    if (finished) return { ...tail, state: SCHEDULE.READY, exercise: finished, dueAt: exerciseDueAt(finished, goal) };
-
-    // Nothing has ever been finished, so there is no interval to wait out — an open
-    // exercise does not anchor one.
-    return { ...tail, state: SCHEDULE.READY, dueAt: 0 };
+    return { ...tail, state: SCHEDULE.READY };
 }
 
 /** Whether building a new exercise is permitted right now. Deliberately a
@@ -232,15 +134,4 @@ export function planSchedule({ goal, exercises = [], quota = null, now = Date.no
  *  asks and the only one that may be answered "no" without a message. */
 export function canStartNewExercise(plan) {
     return plan.state === SCHEDULE.READY;
-}
-
-/**
- * When the exercise being resumed WOULD unlock the next one, had it been finished
- * now. Only ever shown as a hint, and only on the result page while an exercise is
- * still open — the gate itself is `exerciseDueAt`, computed from the real
- * `completedAt`, so this value cannot make the goal unlock early by being shown.
- */
-export function projectedDueAt(intervalDays, from = Date.now()) {
-    const days = Number(intervalDays);
-    return addDays(from, Number.isFinite(days) && days > 0 ? Math.round(days) : 1);
 }

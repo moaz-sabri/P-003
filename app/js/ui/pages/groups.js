@@ -20,10 +20,10 @@
 import { h, link, emptyState, statRow, stat, icon } from "../dom.js";
 import { head, card, section } from "../page.js";
 import { confirm } from "../dialog.js";
-import { field, textInput, form, submitButton } from "../fields.js";
+import { field, textInput, selectInput, form, submitButton } from "../fields.js";
 import * as toast from "../toast.js";
 import { t } from "../../i18n/i18n.js";
-import { LIMITS } from "../../domain/validation.js";
+import { LIMITS, GROUP_CATEGORIES } from "../../domain/validation.js";
 import * as groups from "../../services/group-service.js";
 import * as questions from "../../services/question-service.js";
 import * as content from "../../services/goal-content-service.js";
@@ -52,14 +52,45 @@ export async function render() {
             null
         ));
     } else {
-        const list = h("div.stack-tight");
-        for (const row of named) list.appendChild(await rowFor(row));
-        node.appendChild(list);
+        node.appendChild(await categoryList(named));
     }
 
     node.appendChild(section("groups.create_heading", createForm()));
 
     return { node };
+}
+
+/**
+ * The shelf list, grouped by category and sorted into the fixed category order.
+ *
+ * A GROUP'S CATEGORY IS A HEADING, NOT A FILTER: the shelf appears once, under
+ * whichever of the three known categories it was filed in, or at the bottom under
+ * "no category" when it has none or its id is no longer a known one. The fallback
+ * being shared is deliberate — a group whose category is unknown reads exactly
+ * like a group whose reader never picked one, which, for the reader, it is.
+ */
+async function categoryList(named) {
+    const buckets = new Map(GROUP_CATEGORIES.map((c) => [c.id, []]));
+    const uncategorised = [];
+
+    for (const row of named) {
+        const cat = row.group.category;
+        if (buckets.has(cat)) buckets.get(cat).push(row);
+        else uncategorised.push(row);
+    }
+
+    const list = h("div.stack-tight");
+    for (const cat of GROUP_CATEGORIES) {
+        const rows = buckets.get(cat.id);
+        if (!rows.length) continue;
+        list.appendChild(h("h3", { text: t(cat.labelKey) }));
+        for (const row of rows) list.appendChild(await rowFor(row));
+    }
+    if (uncategorised.length) {
+        list.appendChild(h("h3", { text: t("groups.category_none") }));
+        for (const row of uncategorised) list.appendChild(await rowFor(row));
+    }
+    return list;
 }
 
 /**
@@ -131,6 +162,17 @@ function createForm() {
         labelKey: "groups.field_name",
         control: textInput({ maxlength: LIMITS.GROUP_NAME_MAX })
     });
+    const category = field({
+        labelKey: "groups.field_category",
+        hintKey: "groups.category_hint",
+        control: selectInput({
+            value: "",
+            options: [
+                { value: "", labelKey: "groups.category_none" },
+                ...GROUP_CATEGORIES.map((c) => ({ value: c.id, labelKey: c.labelKey }))
+            ]
+        })
+    });
     const save = submitButton("groups.create_button");
 
     const body = form(async () => {
@@ -139,18 +181,25 @@ function createForm() {
         // reusable: the next step, if the reader wants one, is pointing a goal at it
         // from that goal's page. Passing a goal id here used to be the only way to make
         // a group at all, and it is the reason a shelf could not be shared.
-        const result = await groups.create({ name: name.control.value });
+        const result = await groups.create({
+            name: name.control.value,
+            // An empty pick is "no category" — the shelf is drawn under the fallback
+            // heading, which is where a shelf without a category belongs.
+            category: category.control.value || null
+        });
         if (!result.ok) {
             save.setBusy(false);
             name.setError(result.errors.name);
             return;
         }
         name.control.value = "";
+        category.control.value = "";
         save.setBusy(false);
         toast.show("toast.group_created");
         go("/groups");
     },
     name.node,
+    category.node,
     h("p.small.muted", { style: { "margin-top": "var(--space-1)" }, text: t("groups.name_hint") }),
     save.node
     );
@@ -172,12 +221,12 @@ function createForm() {
 export async function renderGroup(ctx) {
     const id = ctx?.route?.params?.id ?? null;
     if (!id) {
-        return { node: emptyState(t("error.not_found"), t("common.back"), link("/groups", { class: "btn" })) };
+        return { node: emptyState(t("error.not_found"), t("common.back"), link("/groups", t("common.back"), { class: "btn" })) };
     }
 
     const group = await groups.getGroup(id).catch(() => null);
     if (!group || group.deletedAt) {
-        return { node: emptyState(t("error.not_found"), t("common.back"), link("/groups", { class: "btn" })) };
+        return { node: emptyState(t("error.not_found"), t("common.back"), link("/groups", t("common.back"), { class: "btn" })) };
     }
 
     const [list, users] = await Promise.all([

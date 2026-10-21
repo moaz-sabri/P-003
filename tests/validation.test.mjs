@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 
 import {
     LIMITS,
+    GROUP_CATEGORIES,
     QUESTION_KINDS,
     assertValid,
     cleanText,
@@ -20,9 +21,7 @@ import {
     validateGoal,
     validateQuestion
 } from "../app/js/domain/validation.js";
-import {
-    DEFAULT_DURATION_DAYS, DEFAULT_INTERVAL_DAYS, DEFAULT_NEW_PER_EXERCISE, DEFAULT_REVIEW_DEPTH
-} from "../app/js/config.js";
+import { NEW_PER_EXERCISE, REVIEW_DEPTH } from "../app/js/config.js";
 
 const option = (text, isCorrect = false) => ({ text, isCorrect });
 
@@ -50,32 +49,30 @@ test("foldText folds Arabic letterforms, which arrive already shaped", () => {
     assert.notEqual(foldText("علي"), foldText("عlei"));
 });
 
-test("a goal needs a title and gets its numbers clamped", () => {
+test("a goal needs a title, and its plan is the fixed pair of constants", () => {
     const empty = validateGoal({});
     assert.equal(empty.ok, false);
     assert.equal(empty.errors.title, "required");
-    // The numbers are still usable while the title is wrong, so the form can be
+    // The plan is still there while the title is wrong, so the form can be
     // shown back with only the missing field underlined.
-    assert.equal(empty.values.newPerExercise, DEFAULT_NEW_PER_EXERCISE);
+    assert.equal(empty.values.newPerExercise, NEW_PER_EXERCISE);
+    assert.equal(empty.values.reviewDepth, REVIEW_DEPTH);
 
     assert.equal(validateGoal({ title: "   " }).errors.title, "required");
     assert.equal(validateGoal({ title: "x".repeat(LIMITS.TITLE_MAX + 1) }).errors.title, "too_long");
     assert.equal(validateGoal({ title: "x".repeat(LIMITS.TITLE_MAX) }).ok, true);
 
-    // A phone number field overshoots and a paste brings a whole paragraph.
-    // Refusing the save over an interval one day too long teaches people the field
-    // is hostile; correcting it and saying so does not.
-    const wild = validateGoal({ title: "G", newPerExercise: 9999, reviewDepth: 0, intervalDays: -5 });
-    assert.equal(wild.ok, true);
-    assert.equal(wild.values.newPerExercise, LIMITS.NEW_PER_EXERCISE_MAX);
-    assert.equal(wild.values.reviewDepth, LIMITS.REVIEW_DEPTH_MIN);
-    assert.equal(wild.values.intervalDays, LIMITS.INTERVAL_DAYS_MIN);
-
-    // Nonsense is not a number and falls back to the default rather than to NaN,
-    // which would write NaN into the record and defeat every later comparison.
-    const junk = validateGoal({ title: "G", intervalDays: "soon" });
-    assert.equal(junk.values.intervalDays, DEFAULT_INTERVAL_DAYS);
-    assert.ok(Number.isFinite(junk.values.intervalDays));
+    // The plan is fixed, so numbers a legacy draft still carries are DROPPED rather
+    // than clamped: a goal saved from now on carries exactly the constants, and the
+    // two old plan fields that existed on a stored goal are not read at all.
+    const legacy = validateGoal({
+        title: "G", newPerExercise: 9999, reviewDepth: 0, intervalDays: -5, durationDays: 999
+    });
+    assert.equal(legacy.ok, true);
+    assert.equal(legacy.values.newPerExercise, NEW_PER_EXERCISE);
+    assert.equal(legacy.values.reviewDepth, REVIEW_DEPTH);
+    assert.equal(legacy.values.intervalDays, undefined);
+    assert.equal(legacy.values.durationDays, undefined);
 });
 
 test("a goal reports every wrong field at once", () => {
@@ -226,28 +223,6 @@ test("two problems with one field report the first one, not the last", () => {
     assert.equal(longAndDuplicated.errors["options.1"], "too_long");
 });
 
-test("an emptied number is the default, not the minimum", () => {
-    // `Number("")` is 0 and `Number("  ")` is 0, so a numeric field the reader
-    // cleared and saved was clamped up to the minimum: "5 new per exercise"
-    // silently became 1, with no error and nothing on the goal page to show it.
-    const cleared = validateGoal({ title: "g", newPerExercise: "", reviewDepth: "  ", intervalDays: "", durationDays: "" });
-    assert.equal(cleared.ok, true);
-    assert.equal(cleared.values.newPerExercise, DEFAULT_NEW_PER_EXERCISE);
-    assert.equal(cleared.values.reviewDepth, DEFAULT_REVIEW_DEPTH);
-    assert.equal(cleared.values.intervalDays, DEFAULT_INTERVAL_DAYS);
-    assert.equal(validateGoal({ title: "g", newPerExercise: "", reviewDepth: "  ", intervalDays: "", durationDays: "" }).values.durationDays, DEFAULT_DURATION_DAYS);
-
-    // An explicit zero is still the minimum, which is a different thing entirely.
-    assert.equal(validateGoal({ title: "g", newPerExercise: "0" }).values.newPerExercise, LIMITS.NEW_PER_EXERCISE_MIN);
-});
-
-test("a goal has a duration and it is clamped", () => {
-    const out = validateGoal({ title: "g", durationDays: "4000" });
-    assert.equal(out.values.durationDays, LIMITS.DURATION_DAYS_MAX);
-    // A duration is part of the plan, so it is part of the values handed back.
-    assert.equal(typeof validateGoal({ title: "g" }).values.durationDays, "number");
-});
-
 test("assertValid turns a failure into one error the API can return", () => {
     const good = validateQuestion({ text: "q", kind: "single", options: [option("a", true), option("b")] });
     assert.deepEqual(assertValid(good, "question").options.length, 2);
@@ -284,6 +259,27 @@ test("a group name that is too long for a chip is refused", () => {
     const long = "x".repeat(LIMITS.GROUP_NAME_MAX + 1);
     assert.equal(validateGroup({ name: long }).errors.name, "too_long");
     assert.equal(validateGroup({ name: "x".repeat(LIMITS.GROUP_NAME_MAX) }).ok, true);
+});
+
+test("a group's category is one of the fixed ids, or nothing at all", () => {
+    // The three shelves a whole shelf can be filed under come from GROUP_CATEGORIES,
+    // and the stored value is the id — the translation lives in strings.js, keyed
+    // by labelKey — so the free-form test here is the one the picker can actually
+    // produce. The order the list is drawn in is the fixed order, not the order
+    // groups happen to have been created in.
+    assert.deepEqual(GROUP_CATEGORIES.map((c) => c.id), ["education", "sport", "cooking"]);
+
+    assert.equal(validateGroup({ name: "Verbs", category: "education" }).values.category, "education");
+    assert.equal(validateGroup({ name: "Verbs", category: "cooking" }).values.category, "cooking");
+
+    // An unknown id and a missing category are the same thing: both become `null`,
+    // which is the "no category" heading the grouped list falls back to. Inventing
+    // a category for an id the app does not know would file the group under a
+    // heading nobody can find.
+    assert.equal(validateGroup({ name: "Verbs", category: "languages" }).values.category, null);
+    assert.equal(validateGroup({ name: "Verbs", category: "" }).values.category, null);
+    assert.equal(validateGroup({ name: "Verbs" }).values.category, null);
+    assert.equal(validateGroup({ name: "Verbs" }).ok, true);
 });
 
 test("two groups on the device cannot share a name", () => {

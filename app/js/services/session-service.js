@@ -44,9 +44,10 @@
 //     says so.
 
 import { planSchedule, SCHEDULE } from "../domain/schedule.js";
+import { REVIEW_DEPTH } from "../config.js";
 import {
     buildExercisePlan, buildSelectedPlan, nextExerciseNumber, hasAnythingToAsk, reviewWindow,
-    exerciseQuota
+    exerciseQuota, shuffle
 } from "../domain/exercise-builder.js";
 import {
     questionsForGoal, questionsForSelection, isExactSelection
@@ -56,7 +57,6 @@ import {
 } from "../domain/session.js";
 import { latestAttempt } from "../domain/stats.js";
 import { ScheduleError, InvalidTransitionError, NotFoundError } from "../domain/errors.js";
-import { addDays } from "../domain/time.js";
 import { getGoal, goalRefsFor } from "../data/repo-goals.js";
 import { listQuestions, listAllOptions, orderOptions } from "../data/repo-questions.js";
 import {
@@ -162,9 +162,9 @@ export async function start({ goalId, groupIds = null, questionIds = null, exclu
     // reader liked. What stops them queueing forty is the cap, which counts how fast
     // exercises are STARTED and so does not punish somebody who simply left one open.
     //
-    // The goal's own WAITING state is still honoured: finishing an exercise sets the
-    // next one's date, and that date is still the answer.
-    if (plan.state === SCHEDULE.WAITING) throw new ScheduleError("too_soon");
+    // There used to be a second gate here — the interval, `SCHEDULE.WAITING`, a
+    // "come back in N days" refusal. The interval is gone with the plan it belonged
+    // to, so the cap is the only thing `start` may refuse on.
     if (plan.state === SCHEDULE.RATE_LIMITED) throw new ScheduleError("too_many_exercises", { quota });
 
     const [questions, attempts] = await Promise.all([
@@ -188,18 +188,18 @@ export async function start({ goalId, groupIds = null, questionIds = null, exclu
         // still the guard, and it is here for the case where every named question was
         // deleted on another device since the picker drew it: a session with no items
         // is one that finishes instantly and reads as a completed sitting.
-        built = buildSelectedPlan({ questions: pool, history });
+        built = buildSelectedPlan({ questions: pool, history, rand });
         if (!hasAnythingToAsk(built)) throw new ScheduleError("nothing_to_exercise");
     } else {
         // THE PLANNED SESSION. The review window is the questions of the last
-        // `reviewDepth` exercises, oldest first, and this is the whole of what makes a
-        // session grow: 5 new per session with a 3-deep window gives 5, then 10, then
-        // 15, then 20, and 20 for as long as the questions last. It is read from the
+        // `REVIEW_DEPTH` exercises, oldest first, and this is the whole of what makes a
+        // session grow: 10 new per session with a 3-deep window gives 10, then 20,
+        // then 30, and 30 for as long as the questions last. It is read from the
         // item rows rather than derived from the attempt log because "which questions
         // were in the last three sessions" is a question about session ITEMS, and the
         // item rows are the record of that.
-        const window = reviewWindow(await itemsOfLast(exercises, goal), goal);
-        built = buildExercisePlan({ goal, questions: pool, history, recent: window, rand });
+        const window = reviewWindow(await itemsOfLast(exercises));
+        built = buildExercisePlan({ questions: pool, history, recent: window, rand });
         if (!hasAnythingToAsk(built)) throw new ScheduleError("nothing_to_exercise");
     }
 
@@ -210,7 +210,6 @@ export async function start({ goalId, groupIds = null, questionIds = null, exclu
         goalId: goal.id,
         number: nextExerciseNumber(exercises),
         items: built.items,
-        intervalDays: goal.intervalDays,
         groupIds,
         questionIds,
         excludeIds
@@ -279,8 +278,13 @@ export async function repeat(exerciseId, { rand = Math.random } = {}) {
             order,
             questionText: item.questionText,
             questionKind: item.questionKind,
-            options: (item.options ?? []).map((o) => ({
-                id: o.id, text: o.text, isCorrect: Boolean(o.isCorrect), order: o.order
+            // THE OPTIONS ARE SHUFFLED AGAIN. A repeat is a NEW exercise, and the one
+            // thing every freshly built exercise has in common is that its options
+            // were arranged by `rand` at build time — see `freeze` in the builder and
+            // `buildSelectedPlan`. The `order` is rewritten to the new position, so
+            // the arrangement survives a reload exactly like every other build's.
+            options: shuffle(item.options ?? [], rand).map((o, i) => ({
+                id: o.id, text: o.text, isCorrect: Boolean(o.isCorrect), order: i
             }))
         }));
     if (!items.length) throw new ScheduleError("nothing_to_exercise");
@@ -289,7 +293,6 @@ export async function repeat(exerciseId, { rand = Math.random } = {}) {
         goalId: goal.id,
         number: nextExerciseNumber(exercises),
         items,
-        intervalDays: goal.intervalDays,
         // THE ORIGINAL'S SELECTION, all three halves of it. Copying only `groupIds`
         // was half the answer to "the same questions again": a session the reader
         // built by ticking four specific questions repeated as one that records no
@@ -486,10 +489,10 @@ export async function findExercise(id) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * What the result page shows. Derived from the attempt log, the items' own frozen
- * copies, and the interval on the goal -- all already stored, none of it written again.
+ * What the result page shows. Derived from the attempt log and the items' own frozen
+ * copies -- all already stored, none of it written again.
  *
- * SEVEN FIGURES, and the split between them is the point:
+ * THE FIGURES, and the split between them is the point:
  *
  *    first        what the reader got right the first time they saw each
  *                 question. This is the score. Averaging every tap instead makes a
@@ -500,7 +503,6 @@ export async function findExercise(id) {
  *    final        where the session ended, which is 100% of the items asked by
  *                 construction -- a session does not finish otherwise.
  *    elapsed      from the session's creation to its last answer.
- *    nextDueAt    when the next one opens, from WHEN THIS ONE FINISHED.
  *
  * And the list of what was wrong, with the right answer beside it: `wrongItems`
  * carries the question text and the correct options, read from the item's FROZEN copy.
@@ -508,14 +510,12 @@ export async function findExercise(id) {
  * Tuesday, and resolving the text and the answer key from the question store instead
  * would mean editing one option after the fact silently rewrote what last week's
  * result page said the right answer was.
+ *
+ * (There used to be a seventh figure, `nextDueAt` — when the next exercise unlocks —
+ * and it is gone with the interval it was computed from. A finished exercise ends
+ * with Continue or Stop now, and neither needs a date.)
  */
 export async function summaryFor(exercise) {
-    // The exercise's OWN goal, not the newest active one. It used to be
-    // `getActiveGoal()`, which with one goal was the same record and with several is a
-    // different one: a report for last week's session would then be counting the
-    // interval of whichever goal happened to be newest, so its "next session" date was
-    // another goal's schedule.
-    const goal = await readGoal(exercise.goalId);
     const [items, attempts] = await Promise.all([listItems(exercise.id), listAttempts(exercise.id)]);
     const kinds = countKinds(items, attempts);
     const first = firstPass(items, attempts);
@@ -542,14 +542,7 @@ export async function summaryFor(exercise) {
         reviewCount: kinds.review,
         reviewCorrect: kinds.reviewCorrect,
         elapsed,
-        wrongItems: describeWrong(items, attempts, first.wrongItemIds),
-        // The next unlock is measured from when this session FINISHED, not from when it
-        // was created -- hence `completedAt` and not `createdAt`. A session left open
-        // for three days and finished in a minute must not unlock the next one three
-        // days after the one before it. `schedule.js` computes the same value for the
-        // same session from the same two inputs, which is what stops the two screens
-        // disagreeing.
-        nextDueAt: addDays(exercise.completedAt ?? Date.now(), goal?.intervalDays ?? 1)
+        wrongItems: describeWrong(items, attempts, first.wrongItemIds)
     };
 }
 
@@ -610,8 +603,7 @@ function describeWrong(items, attempts, wrongItemIds) {
  *  wants them in that order and nothing else, and building the whole list here rather
  *  than a window's worth is what keeps the slice in `reviewWindow` the single place the
  *  depth is decided. */
-async function itemsOfLast(exercises, goal) {
-    const depth = Math.max(1, Math.round(Number(goal?.reviewDepth) || 3));
-    const wanted = exercises.slice(-depth);
+async function itemsOfLast(exercises) {
+    const wanted = exercises.slice(-REVIEW_DEPTH);
     return Promise.all(wanted.map((exercise) => listItems(exercise.id)));
 }

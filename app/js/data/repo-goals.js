@@ -118,7 +118,7 @@ export async function listActiveGoals() {
         .sort((a, b) => b.createdAt - a.createdAt || (b.id < a.id ? -1 : 1));
 }
 
-/** Create a goal. There is no update here: the three numbers on a goal change
+/** Create a goal. There is no update here: the numbers on a goal change
  *  through `updateGoalPlan`, which is the only place that knows they can. */
 export async function createGoal(values) {
     const device = await currentDeviceId();
@@ -127,13 +127,12 @@ export async function createGoal(values) {
         title: values.title,
         description: values.description ?? "",
         status: "active",
+        // The plan is the fixed constants in config.js rather than per-goal
+        // numbers; they are still stored on the record so a goal written before
+        // the constants existed keeps readable values, and validation rewrites
+        // any legacy per-goal values the next time it is saved.
         newPerExercise: values.newPerExercise,
         reviewDepth: values.reviewDepth,
-        intervalDays: values.intervalDays,
-        // The end of the plan, in days from creation. Stored rather than derived
-        // from a constant at read time so that changing the default later does not
-        // silently lengthen or shorten a goal somebody is halfway through.
-        durationDays: values.durationDays,
         createdAt: now(),
         completedAt: null,
         // `null` and not absent: the archive query is an index read over
@@ -158,9 +157,7 @@ export async function updateGoalPlan(id, values) {
             updated = touch({
                 ...row,
                 newPerExercise: values.newPerExercise ?? row.newPerExercise,
-                reviewDepth: values.reviewDepth ?? row.reviewDepth,
-                intervalDays: values.intervalDays ?? row.intervalDays,
-                durationDays: values.durationDays ?? row.durationDays
+                reviewDepth: values.reviewDepth ?? row.reviewDepth
             }, device);
             return db.put(STORE.GOALS, updated);
         });

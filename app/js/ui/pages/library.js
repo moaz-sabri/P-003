@@ -64,7 +64,7 @@ export async function render(ctx) {
         listHistory()
     ]);
 
-    const goalId = chosenGoal(ctx?.query?.get("goal") ?? null, goals);
+    const { goalId, pinned } = chosenGoal(ctx?.query?.get("goal") ?? null, goals);
     if (goalId) setCurrentGoal(goalId);
 
     const node = h("div.stack", null);
@@ -85,8 +85,17 @@ export async function render(ctx) {
     // what it is already set to, which is the thing this file's own picker comment in
     // the question list says not to draw — and the sentence beside it says the real
     // thing anyway, with a link to the screen where the missing goal can be made.
-    if (goals.length) node.appendChild(picker(goalId, goals));
-    else node.appendChild(noGoal());
+    //
+    // AND NO PICKER WHEN A GOAL WAS CHOSEN IN THE URL. A reader who arrived here from a
+    // goal's own page already made the choice — "which goal" is answered by the link
+    // they followed — and a picker sitting above a list whose buttons all act on that
+    // same goal is a control that can only say the thing already said. The link back
+    // from a set's own page still carries the goal, so the choice survives the round
+    // trip. Browse without one: open `/library` with no query, and the picker returns.
+    if (!pinned) {
+        if (goals.length) node.appendChild(picker(goalId, goals));
+        else node.appendChild(noGoal());
+    }
 
     const list = h("div.stack");
     for (const pack of packs) list.appendChild(packCard(pack, { goalId, goals }));
@@ -95,7 +104,7 @@ export async function render(ctx) {
     return { node };
 }
 
-/** Which plan this page is acting on.
+/** Which plan this page is acting on, and whether the URL named it.
  *
  * THE REQUESTED GOAL WINS IF IT EXISTS, and the newest active one is only the fallback.
  * It matters which way round those are: a link from an archived plan's own page carries
@@ -103,13 +112,20 @@ export async function render(ctx) {
  * reader's next tap attaches twenty questions to a goal they did not choose. So a request
  * that resolves to nothing falls back — a stale bookmark, a goal deleted on another device
  * — and one that resolves to a goal that exists is honoured whatever its status.
+ *
+ * `pinned` is what decides whether the picker is drawn at all: a goal named in the URL
+ * is a choice already made, and the picker would be a second opinion about it. A request
+ * that had to fall back was not a real choice, so the picker comes back.
  */
 function chosenGoal(requested, goals) {
     const live = new Set(goals.map((goal) => goal.id));
-    if (requested && live.has(requested)) return requested;
-    return goals.find((goal) => goal.status === "active" && !goal.archivedAt)?.id
-        ?? goals[0]?.id
-        ?? null;
+    if (requested && live.has(requested)) return { goalId: requested, pinned: true };
+    return {
+        goalId: goals.find((goal) => goal.status === "active" && !goal.archivedAt)?.id
+            ?? goals[0]?.id
+            ?? null,
+        pinned: false
+    };
 }
 
 /** The plan picker. Changing it navigates rather than hiding the choice in a variable,
@@ -159,6 +175,8 @@ function packCard(pack, { goalId, goals }) {
     const meta = [t("library.pack_questions", { n: String(pack.questions.length) })];
     if (pack.subject) meta.push(pack.subject);
 
+    const inGoal = Boolean(goalId && pack.goals.includes(goalId));
+
     const add = h("button.btn", {
         type: "button",
         // The button is refused rather than hidden when there is nothing to add it to.
@@ -172,13 +190,46 @@ function packCard(pack, { goalId, goals }) {
         h("h2", { style: { "margin": "0" }, text: pack.name }),
         pack.description ? h("p.small.muted", { text: pack.description }) : null,
         h("div.tiny.muted", { text: meta.join(" · ") }),
-        h("div.row", { style: { gap: "var(--space-2)", "margin-top": "var(--space-3)" } },
+        h("div.row", { style: { gap: "var(--space-2)", "margin-top": "var(--space-3)", "flex-wrap": "wrap" } },
             add,
+            // "REMOVE FROM THIS GOAL" SITS BESIDE ADD, OFFERED ONLY WHEN THE CHOSEN GOAL
+            // ALREADY USES THE SET. Add on an installed set is a no-op that re-points the
+            // goal — useful after tidying, but not a change the row should claim — so the
+            // one NEW thing a reader can do with a set their goal already has is take it
+            // off, and that is the button shown. It is reversible in one tap, so it does
+            // not confirm.
+            inGoal
+                ? h("button.btn.btn-danger", {
+                    type: "button",
+                    onclick: (event) => removeFromGoal(event.currentTarget, pack, goalId)
+                }, t("library.remove_from_goal"))
+                : null,
             link(packHref(pack.id, goalId), t("library.preview_button"),
                 { class: "btn btn-secondary" })
         ),
         installedLine(pack, byId)
     );
+}
+
+/**
+ * Take the chosen goal off this set and redraw.
+ *
+ * REMOVES THE GOAL'S REFERENCES TO THE SET, not the questions themselves: the copies
+ * stay on the device, filable and attachable as the reader likes. The page redraws
+ * rather than patching its own row, for the same reason `addToGoal` does — removing a
+ * set changes what the row says, and a row patched by hand is a row claiming something
+ * no read has confirmed.
+ */
+async function removeFromGoal(button, pack, goalId) {
+    button.disabled = true;
+    try {
+        await library.removeFromGoal(pack.id, goalId);
+        toast.show("toast.library_removed");
+        go(libraryHref(goalId), { replace: true });
+    } catch (err) {
+        button.disabled = false;
+        toast.error(err);
+    }
 }
 
 /**
@@ -264,7 +315,7 @@ export async function renderPack(ctx) {
     const id = ctx?.route?.params?.id ?? null;
     const requested = ctx?.query?.get("goal") ?? null;
     const goals = await listHistory();
-    const goalId = chosenGoal(requested, goals);
+    const { goalId } = chosenGoal(requested, goals);
     if (goalId) setCurrentGoal(goalId);
 
     let pack = null;

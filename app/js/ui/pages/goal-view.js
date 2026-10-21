@@ -25,8 +25,8 @@
 //   1. what can be done right now   — the decision, and the buttons it implies
 //   2. what it trains on            — the material, and the attachment screen
 //   3. what it has done             — the exercises, open ones first
-//   4. the plan                     — the four numbers, editable
-//   5. stopping                     — archive, finish, and the refusal to delete
+//   4. the plan                     — the fixed plan, explained
+//   5. stopping                     — archive, finish, or delete
 //
 // The exercises section is THIRD rather than first because the action block above it
 // already offers a resume button per open exercise. What the list adds is the
@@ -37,13 +37,11 @@
 
 import { h, link, statRow, stat } from "../dom.js";
 import { head, card, section, destructiveButton } from "../page.js";
-import { field, numberInput, form, submitButton, row } from "../fields.js";
 import * as toast from "../toast.js";
 import { t, formatDate, formatDateTime, formatPercent } from "../../i18n/i18n.js";
-import { LIMITS } from "../../domain/validation.js";
 import { goalAction } from "../../domain/goal-action.js";
 import {
-    overview, updatePlan, finishAndSucceed, archiveAndSucceed, unarchive, SCHEDULE
+    overview, deleteGoal, finishAndSucceed, archiveAndSucceed, unarchive
 } from "../../services/goal-service.js";
 import * as sessions from "../../services/session-service.js";
 import { go } from "../../app/router.js";
@@ -59,9 +57,11 @@ import { setCurrentGoal } from "../nav.js";
  *              the one the reader's words asked for: "the goal is archived with its
  *              report, and neither deleted nor hidden". It builds nothing new and
  *              appears in the archive.
- *   finish     the plan's own time is up, so it closes. Not reversible, and it
- *              offers a new goal because it is finished.
- *   delete     the goal was a mistake. Refused outright — see `notDeletable`.
+ *   finish     the goal is done, so it closes. Not reversible, and it offers a new
+ *              goal because it is finished.
+ *   delete     the goal was a mistake — remove it entirely. The questions and the
+ *              groups are untouched; the goal, its references and its whole history
+ *              are gone.
  *
  * ARCHIVE AND FINISH BOTH WRITE A SUCCESSOR, and that is not decoration on the two
  * buttons but where the goal limit is actually enforced. Three goals can be worked on
@@ -95,9 +95,6 @@ export async function render(ctx) {
             : null,
         goal.status === "completed" && goal.completedAt
             ? h("p.small.muted", { text: t("goal.finished_on", { time: formatDateTime(goal.completedAt) }) })
-            : null,
-        plan.state === SCHEDULE.EXPIRED
-            ? h("p.small.muted", { text: t("goal.expired_body") })
             : null
     ));
 
@@ -289,88 +286,27 @@ async function repeatExercise(event, exercise) {
 /* -------------------------------- the plan ------------------------------- */
 
 /**
- * The four numbers, editable.
+ * The plan, as a fact rather than a form.
  *
- * "The plan", not the goal's own name. This section used to be headed with the same
- * key the page head uses, so the goal page said "Your goal" twice with a form in
- * between and no reader could tell the heading from a repeat of the title.
+ * It used to be four editable numbers here — new per exercise, review depth, interval
+ * days, duration days — and the two numbers that mattered were the same pair the
+ * create form asked for. They are constants now (`NEW_PER_EXERCISE` and
+ * `REVIEW_DEPTH` in config.js), the same for every goal, so there is nothing to edit;
+ * the section states the one sentence that describes every exercise the goal will
+ * draw. A goal saved before the constants existed keeps its legacy numbers in the
+ * record, but they are read as the constants everywhere a decision is made — see
+ * `validateGoal`, which rewrites them on the next save.
  */
 function planForm(goal) {
-    const per = field({
-        labelKey: "goal.field_new_per_exercise",
-        hintKey: "goal.hint_new_per_exercise",
-        control: numberInput({
-            value: goal.newPerExercise,
-            min: LIMITS.NEW_PER_EXERCISE_MIN,
-            max: LIMITS.NEW_PER_EXERCISE_MAX
-        })
-    });
-    const depth = field({
-        labelKey: "goal.field_review_depth",
-        hintKey: "goal.hint_review_depth",
-        control: numberInput({
-            value: goal.reviewDepth,
-            min: LIMITS.REVIEW_DEPTH_MIN,
-            max: LIMITS.REVIEW_DEPTH_MAX
-        })
-    });
-    const interval = field({
-        labelKey: "goal.field_interval_days",
-        hintKey: "goal.hint_interval_days",
-        control: numberInput({
-            value: goal.intervalDays,
-            min: LIMITS.INTERVAL_DAYS_MIN,
-            max: LIMITS.INTERVAL_DAYS_MAX
-        })
-    });
-    const duration = field({
-        labelKey: "goal.field_duration_days",
-        hintKey: "goal.hint_duration_days",
-        control: numberInput({
-            value: goal.durationDays,
-            min: LIMITS.DURATION_DAYS_MIN,
-            max: LIMITS.DURATION_DAYS_MAX
-        })
-    });
-
-    const save = submitButton("goal.save_button");
-
-    const body = form(async () => {
-        save.setBusy(true);
-        try {
-            await updatePlan(goal.id, {
-                newPerExercise: per.control.value,
-                reviewDepth: depth.control.value,
-                intervalDays: interval.control.value,
-                durationDays: duration.control.value
-            });
-            save.setBusy(false);
-            toast.show("toast.goal_saved");
-            // REDRAW, because three of the four numbers change what the page says.
-            // Widening the interval can turn a Start button into a waiting countdown;
-            // raising `reviewDepth` changes how big the next exercise will be. Saving
-            // and leaving the old numbers on screen is how a reader ends up waiting
-            // for a date they have just changed.
-            go(`/goal/${encodeURIComponent(goal.id)}`);
-        } catch (err) {
-            save.setBusy(false);
-            toast.error(err);
-        }
-    },
-    h("div.stack", null,
-        row(per, depth),
-        interval.node,
-        duration.node,
-        save.node
+    return section("goal.plan_heading", card(
+        h("p.small.muted", { text: t("goal.plan_fixed") })
     ));
-
-    return section("goal.plan_heading", card(body));
 }
 
 /* -------------------------------- actions -------------------------------- */
 
 /**
- * Archive, finish, and the refusal to delete.
+ * Archive, finish, and delete.
  *
  * ARCHIVE IS THE FIRST BUTTON because it is the one that is reversible and it is the
  * one that loses nothing. A reader who wants to stop working on a goal this week taps
@@ -388,6 +324,11 @@ function planForm(goal) {
  * the same plan and the same questions already attached, and the page goes to it. The
  * alternative is a reader who has just finished a plan being shown a list of two goals
  * and a form, on the day they meant to start the next round.
+ *
+ * DELETE IS THIRD AND ALWAYS PRESENT, on an active goal and on an archived one. It is
+ * the offering for the goal that was a mistake — plan, references and history gone,
+ * the questions and the groups untouched — and the one thing the three buttons never
+ * offer by mistake, because it is the only one whose confirm says so.
  */
 function actionsSection(goal, open) {
     const parts = [];
@@ -440,7 +381,18 @@ function actionsSection(goal, open) {
         }
     }
 
-    parts.push(notDeletable());
+    parts.push(destructiveButton("goal.delete_button", {
+        titleKey: "goal.delete_title",
+        bodyKey: "goal.delete_body"
+    }, async () => {
+        try {
+            await deleteGoal(goal.id);
+            toast.show("toast.goal_deleted");
+            go("/goal");
+        } catch (err) {
+            toast.error(err);
+        }
+    }));
 
     // THE BUTTONS ARE STACKED, not laid side by side. `.btn` is `inline-flex`, so two
     // of them inside one card sit on one line with no gap between them and read as a
@@ -472,25 +424,6 @@ function leaveAfterClose(next) {
         return;
     }
     go("/goal");
-}
-
-/**
- * Why there is no delete button.
- *
- * A GOAL IS NOT DELETABLE, and this paragraph is where that is said rather than where
- * it is merely true. It used to be: `deleteGoal` cascaded through questions, options,
- * exercises, items and attempts, and it was reachable from this page. Both halves of
- * that are wrong now. Questions are filed under groups and can be pointed at by any
- * goal, so cascading them away destroys material the reader can still use; and the
- * reader's instruction is explicit — the goal is archived, with its report, and neither
- * deleted nor hidden.
- *
- * So the button is gone rather than disabled. A greyed-out Delete is a promise the app
- * has not kept, and the sentence below it is the honest version: the goal stays, and
- * here is where it went.
- */
-function notDeletable() {
-    return h("p.small.muted", { style: { "margin-top": "var(--space-3)" }, text: t("goal.not_deletable") });
 }
 
 /* ------------------------------- not found ------------------------------- */

@@ -1,11 +1,11 @@
-// The result page: what just happened, and when the next one opens.
+// The result page: what just happened, and what to do next.
 //
 // Everything on it is DERIVED from records that already exist — the attempt log for
-// the score, the exercise record for when it finished, the goal for the interval — and
-// nothing here is written. That is not asceticism: a "result" record would be a fifth
-// copy of an answer, and the app's whole design is that the attempt log is the answer.
-// `summaryFor()` in session-service.js is where those numbers are put together; this
-// page only arranges them.
+// the score, the exercise record for when it finished — and nothing here is written.
+// That is not asceticism: a "result" record would be a fifth copy of an answer, and
+// the app's whole design is that the attempt log is the answer. `summaryFor()` in
+// session-service.js is where those numbers are put together; this page only arranges
+// them.
 //
 // IT IS ABOUT AN EXERCISE, NAMED IN THE PATH. It used to be `/exercise/result?id=x` with
 // a `?goal=` fallback, and it could be reached with no id at all — in which case it
@@ -15,23 +15,23 @@
 // the records. A reader who opens the result page is asking about a session they just
 // did; asking them to have found it is not a thing a page should do.
 //
-// The one thing it does that the home page does not is show the NEXT unlock, and it
-// shows it as a live countdown for the same reason the home page does: a number
-// computed when the page opened goes stale within the hour, and a stale "opens in 4
-// hours" is worse than no countdown at all. The interval is half a minute rather than
-// a second — the answer changes in minutes, and nothing on this screen is worth waking
-// a phone for more often than that.
+// THE "WHAT NEXT" LINE IS TWO BUTTONS, and they are the whole point of the page. A
+// finished exercise used to end with a countdown to the next unlock, tied to an
+// interval and a plan length that no longer exist. Now the plan is a fixed ten new
+// plus a review of the last three, and the only thing that can be between the reader
+// and the next sitting is the rate cap — so the page says "ready when you are" and
+// offers Continue (start the next exercise now) or Stop (back to the goal). No dates,
+// no clock, no "come back on the 14th".
 
 import { h, statRow, stat, link, emptyState, meter } from "../dom.js";
 import { head, section, card } from "../page.js";
 import * as toast from "../toast.js";
-import { t, formatPercent, formatCountdown, formatStopwatch } from "../../i18n/i18n.js";
+import { t, formatPercent, formatStopwatch } from "../../i18n/i18n.js";
 import * as sessions from "../../services/session-service.js";
 import { getGoal } from "../../services/goal-service.js";
 import { go } from "../../app/router.js";
 import { setCurrentGoal } from "../nav.js";
 import { exerciseHref } from "../parts/goal-actions.js";
-import { remaining } from "../../domain/time.js";
 
 /**
  * @param {{route: {params: {id: string}}}} ctx  the exercise's id is in the PATH.
@@ -61,16 +61,11 @@ export async function render(ctx) {
         getGoal(exercise.goalId).catch(() => null)
     ]);
 
-    // The timer is created by the card that needs it and collected here, because
-    // `destroy` is the only reliable place an interval can be cleared from: there is no
-    // unload a page can count on, and an interval left running keeps painting a node
-    // that is no longer in the document.
-    const timers = [];
-    const node = page(summary, goal, exercise, timers);
-    return { node, destroy: () => { for (const timer of timers) clearInterval(timer); } };
+    const node = page(summary, goal);
+    return { node };
 }
 
-function page(summary, goal, exercise, timers) {
+function page(summary, goal) {
     const node = h("div.stack", null);
     node.appendChild(head("result.title", null));
 
@@ -119,16 +114,15 @@ function page(summary, goal, exercise, timers) {
         node.appendChild(section("result.wrong_heading", wrongCard(summary)));
     }
 
-    node.appendChild(section("result.next_heading", nextCard(summary, goal, timers)));
+    node.appendChild(section("result.next_heading", nextCard(summary, goal)));
 
-    // DONE LEADS TO THE GOAL, not to the home page. The sitting belonged to a goal and
-    // the goal is where the next one is started and where this one is listed; sending a
-    // reader who has just finished something to a dashboard instead of to the plan they
-    // were working on is a wasted tap on the most common navigation in the app.
+    // DONE LEADS ON HERE. The Continue/Stop decision lives in `nextCard` above, where it
+    // belongs to the exercise that was just finished; this row is the shelf below it —
+    // "run the same questions again" and the report — and the only navigation that is
+    // the same no matter what the goal's state is.
     node.appendChild(h("div.btn-row", null,
-        link(`/goal/${encodeURIComponent(exercise.goalId)}`, t("result.goal_button"), { class: "btn" }),
-        repeatButton(exercise),
-        link(`/reports?goal=${encodeURIComponent(exercise.goalId)}`, t("result.reports_button"), { class: "btn btn-secondary" })
+        repeatButton(summary.exercise),
+        link(`/reports?goal=${encodeURIComponent(summary.exercise.goalId)}`, t("result.reports_button"), { class: "btn btn-secondary" })
     ));
 
     return node;
@@ -185,11 +179,17 @@ function wrongCard(summary) {
 
 /* -------------------------------- what next -------------------------------- */
 
-function nextCard(summary, goal, timers) {
-    // A goal that has been closed or archived — here or on another device since this
-    // exercise was finished — has no next exercise, so the only action worth offering is
-    // the one that starts a new goal. Handled before the countdown because a countdown to
-    // an exercise that can never exist is a number that never reaches zero.
+/**
+ * The end of an exercise: what the reader does from here.
+ *
+ * Two answers, and the goal's state is the only thing between them. A goal that has
+ * been closed or archived — here or on another device since this exercise was
+ * finished — has no next exercise, so the only action worth offering is the one that
+ * starts a new goal. Every other goal is ready when the reader is, because the plan
+ * is fixed and nothing between exercises but the rate cap counts down; there is no
+ * date to report and no reason to wait.
+ */
+function nextCard(summary, goal) {
     if (!goal || goal.status === "completed" || goal.archivedAt) {
         return card(
             h("p", { text: goal?.archivedAt ? t("goal.archived_body") : t("goal.finished_body") }),
@@ -197,30 +197,36 @@ function nextCard(summary, goal, timers) {
         );
     }
 
-    // `summaryFor` derives the unlock from the goal's own interval, so a zero here means
-    // the goal arrived from a sync with a null one. The page checks rather than trusts,
-    // because "opens in " followed by nothing is a sentence with a hole in it and the
-    // alternative — believing it — is a permanently locked exercise with no way to find
-    // out why.
-    if (!summary.nextDueAt || remaining(summary.nextDueAt) === 0) {
-        return card(
-            h("p", { text: t("result.next_now") }),
-            // The GOAL, not the exercise screen: the next exercise is a decision this
-            // goal's page makes, from the same schedule this countdown came from.
-            link(`/goal/${encodeURIComponent(summary.exercise.goalId)}`, t("home.start_exercise"), { class: "btn btn-block" })
-        );
-    }
+    // READY WHEN YOU ARE. There used to be a third branch here that counted down to the
+    // next unlock and, when there was none, offered only the goal page; both are gone
+    // with the interval. Start the next exercise (Continue) or go to the goal (Stop) —
+    // `sessions.start` refuses on the rate cap with its own message, so this page does
+    // not have to know the cap's date.
+    return card(
+        h("p", { text: t("result.next_now") }),
+        h("div.btn-row", null,
+            continueButton(summary.exercise.goalId),
+            link(`/goal/${encodeURIComponent(summary.exercise.goalId)}`, t("result.stop_button"), { class: "btn btn-secondary" })
+        )
+    );
+}
 
-    const countdown = h("span.nums");
-    const paint = () => { countdown.textContent = formatCountdown(remaining(summary.nextDueAt)); };
-    paint();
-    timers.push(setInterval(paint, 30_000));
-
-    // NO BUTTON HERE. The two branches above each carry the one thing worth doing next
-    // — start a new goal, start the exercise — and this branch's action is "go to the
-    // goal", which the page already has a button for, directly below. Two controls to the
-    // same place on one screen is one too many.
-    return card(h("p", null, t("result.next_in"), " ", countdown));
+/** Continue: build and open the next exercise of the same goal, now. */
+function continueButton(goalId) {
+    return h("button.btn.btn-primary", {
+        type: "button",
+        onclick: async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+                const { exercise } = await sessions.start({ goalId });
+                go(exerciseHref(exercise.id));
+            } catch (err) {
+                button.disabled = false;
+                toast.error(err);
+            }
+        }
+    }, t("result.continue_button"));
 }
 
 /* ------------------------------ nothing to see ----------------------------- */

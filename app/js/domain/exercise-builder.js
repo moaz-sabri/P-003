@@ -2,27 +2,28 @@
 //
 // The rules, and the reasoning behind each one:
 //
-//   * AN EXERCISE IS `newPerExercise` NEW ITEMS PLUS UP TO
-//     `ceil(newPerExercise × reviewDepth)` REVIEWED ONES. The cap is a multiple
-//     of the new count on purpose: a review item is worth exactly one new item,
-//     so a goal asking for five new questions per day and a goal allowing
-//     fifteen reviews per day is asking for twice the work for the same return,
-//     and the number that keeps the two goals doing the same amount of reading
-//     is 15 — which is why reviewDepth 3 is the default rather than 3 being a
-//     literal count of items.
+//   * AN EXERCISE IS `NEW_PER_EXERCISE` NEW ITEMS PLUS UP TO
+//     `NEW_PER_EXERCISE × REVIEW_DEPTH` REVIEWED ONES. Both numbers are the
+//     fixed plan in config.js — ten new questions and a review of the last
+//     three exercises — and they used to be numbers every goal carried and
+//     every goal form let the reader change. They are constants now because a
+//     fixed plan is one less decision per goal and one less plan to display.
+//     The review cap is a multiple of the new count on purpose: a review item
+//     is worth exactly one new item, so an exercise that introduces ten
+//     questions also has room for up to thirty reviews — which is why
+//     `REVIEW_DEPTH` is 3 rather than 3 being a literal count of items.
 //
-//   * THE REVIEW POOL IS THE QUESTIONS OF THE LAST `reviewDepth` EXERCISES. It
+//   * THE REVIEW POOL IS THE QUESTIONS OF THE LAST `REVIEW_DEPTH` EXERCISES. It
 //     is not "everything ever answered wrongly", and the difference is the whole
-//     behaviour of the app. With the defaults — 5 new, review the last 3 — the
-//     exercises come out at 5, then 10, then 15, then 20, and stay at 20, which
-//     is the plan a reader is asked for when they set a goal. A pool of
-//     "questions whose last answer was wrong" produces a different number every
-//     time for a reason nobody can predict: a question answered CORRECTLY leaves
-//     the pool and can never be reviewed again, so a reader who knows their
-//     material sees every exercise shrink back to `newPerExercise` and the
-//     repetition the goal was built on silently stops happening. Worse, the
-//     questions they got wrong are permanent members, so a handful of stuck ones
-//     keep the review slots full forever and everything behind them starves.
+//     behaviour of the app. The exercises come out at 10, then 20, then 30, and
+//     stay at 30 for as long as the questions last — a pool of "questions whose
+//     last answer was wrong" produces a different number every time for a reason
+//     nobody can predict: a question answered CORRECTLY leaves the pool and can
+//     never be reviewed again, so a reader who knows their material sees every
+//     exercise shrink back to `NEW_PER_EXERCISE` and the repetition the plan is
+//     built on silently stops happening. Worse, the questions they got wrong are
+//     permanent members, so a handful of stuck ones keep the review slots full
+//     forever and everything behind them starves.
 //
 //   * A QUESTION CANNOT BE BOTH. Anything taken as new is removed from the review
 //     pool, and the pool is de-duplicated, because a question appearing twice in
@@ -39,7 +40,7 @@
 
 import { LIMITS } from "./validation.js";
 import {
-    DEFAULT_NEW_PER_EXERCISE, DEFAULT_REVIEW_DEPTH, MAX_EXERCISES_PER_WINDOW, EXERCISE_WINDOW_DAYS
+    NEW_PER_EXERCISE, REVIEW_DEPTH, MAX_EXERCISES_PER_WINDOW, EXERCISE_WINDOW_DAYS
 } from "../config.js";
 
 /** What one attempt says about one question, once the record is reduced to the
@@ -83,29 +84,16 @@ export function shuffle(list, rand = Math.random) {
     return out;
 }
 
-/** How many review items one exercise may carry. */
-export function reviewCapacity(goal) {
-    const per = clamp(goal?.newPerExercise, LIMITS.NEW_PER_EXERCISE_MIN, LIMITS.NEW_PER_EXERCISE_MAX, DEFAULT_NEW_PER_EXERCISE);
-    const depth = clamp(goal?.reviewDepth, LIMITS.REVIEW_DEPTH_MIN, LIMITS.REVIEW_DEPTH_MAX, DEFAULT_REVIEW_DEPTH);
-    return Math.ceil(per * depth);
-}
-
-function clamp(value, min, max, fallback) {
-    const n = Number(value);
-    // AN EMPTY FIELD IS NOT ZERO. `Number("")` is 0, not NaN, so a numeric input
-    // the reader cleared and then saved arrived here as a real 0 and was clamped
-    // up to the MINIMUM — silently turning "5 new per exercise" into 1, with no
-    // error and nothing on screen to say so. A form that sends an empty string is
-    // asking for the default, and the default is what the goal form pre-filled.
-    if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
-        return fallback;
-    }
-    if (!Number.isFinite(n)) return fallback;
-    return Math.min(max, Math.max(min, Math.round(n)));
+/** How many review items one exercise may carry: the review depth as a multiple
+ *  of the new count, because a review item is worth exactly one new item. Both
+ *  numbers are the fixed plan, so this is a constant too — and it is still a
+ *  function rather than a number so the plan reads in one place. */
+export function reviewCapacity() {
+    return Math.ceil(NEW_PER_EXERCISE * REVIEW_DEPTH);
 }
 
 /**
- * The review window: the question ids of the last `reviewDepth` exercises, oldest
+ * The review window: the question ids of the last `REVIEW_DEPTH` exercises, oldest
  * exercise first, de-duplicated.
  *
  * The ORDER is the window's order and nothing else — oldest first, so the question
@@ -115,12 +103,14 @@ function clamp(value, min, max, fallback) {
  * have merged the same records must build the same exercise, and `Math.random`
  * cannot promise that.
  *
+ * The depth used to be a goal's own number; it is the `REVIEW_DEPTH` constant now,
+ * read here so that changing the plan changes this one place and nowhere else.
+ *
  * @param {{questionId: string}[][]} itemsByExercise  items of each exercise,
  *   oldest exercise first
  */
-export function reviewWindow(itemsByExercise, goal) {
-    const depth = clamp(goal?.reviewDepth, LIMITS.REVIEW_DEPTH_MIN, LIMITS.REVIEW_DEPTH_MAX, DEFAULT_REVIEW_DEPTH);
-    const window = (Array.isArray(itemsByExercise) ? itemsByExercise : []).slice(-depth);
+export function reviewWindow(itemsByExercise) {
+    const window = (Array.isArray(itemsByExercise) ? itemsByExercise : []).slice(-REVIEW_DEPTH);
     const seen = new Set();
     const out = [];
     for (const items of window) {
@@ -147,7 +137,7 @@ export function reviewWindow(itemsByExercise, goal) {
  * reader who closes the app on question 11 comes back to question 11 — not to a
  * freshly shuffled list where question 11 is now somewhere else.
  *
- * @param {{goal: object, questions: object[], history: Map<string, object>,
+ * @param {{questions: object[], history: Map<string, object>,
  *          recent?: string[], rand?: () => number}} input
  *   `recent` is the review window — see `reviewWindow` — and defaults to empty,
  *   which is the correct answer for the first exercise of a goal.
@@ -155,14 +145,11 @@ export function reviewWindow(itemsByExercise, goal) {
  *            newCount: number, reviewCount: number, total: number,
  *            freshLeft: number, reviewLeft: number}}
  */
-export function buildExercisePlan({ goal, questions, history, recent = [], rand = Math.random }) {
+export function buildExercisePlan({ questions, history, recent = [], rand = Math.random }) {
     const { fresh, review, learned } = classifyQuestions(questions, history);
 
-    const perExercise = clamp(
-        goal?.newPerExercise,
-        LIMITS.NEW_PER_EXERCISE_MIN, LIMITS.NEW_PER_EXERCISE_MAX, DEFAULT_NEW_PER_EXERCISE
-    );
-    const capacity = reviewCapacity(goal);
+    const perExercise = NEW_PER_EXERCISE;
+    const capacity = reviewCapacity();
 
     const newItems = fresh.slice(0, perExercise);
     const taken = new Set(newItems.map((q) => q.id));
@@ -197,20 +184,21 @@ export function buildExercisePlan({ goal, questions, history, recent = [], rand 
     // for the questions that had been seen before, which is the hardest kind of fault
     // to reproduce by hand.
     //
-    // The option `order` is carried through rather than dropped: "the third option"
-    // has to mean the same thing on every device and after every reload, so an
-    // option's place is its stored order and never its position in whatever array
-    // happened to be built here.
+    // THE OPTIONS ARE SHUFFLED ONCE, HERE, and the shuffle is stored: each option's
+    // `order` is rewritten to its place in the shuffled list, so "the third option"
+    // means the same thing on every device and after every reload. The option order
+    // is therefore fixed the moment the exercise is frozen, which is the one thing
+    // that keeps a session from re-shuffling under the reader's hands.
     const freeze = (question, itemKind) => ({
         questionId: question.id,
         kind: itemKind,
         questionText: question.text,
         questionKind: question.kind,
-        options: (question.options ?? []).map((o, i) => ({
+        options: shuffle(question.options ?? [], rand).map((o, i) => ({
             id: o.id,
             text: o.text,
             isCorrect: Boolean(o.isCorrect),
-            order: o.order ?? i
+            order: i
         }))
     });
 
@@ -256,8 +244,8 @@ export function nextExerciseNumber(exercises) {
  *
  * Checked before building, so an empty goal says "add some questions" instead of
  * opening a zero-item exercise that finishes instantly and counts as a completed
- * exercise — which would then lock the goal for a whole interval, having
- * rehearsed nothing.
+ * exercise — which would then count as a sitting to the goal, having rehearsed
+ * nothing.
  */
 export function hasAnythingToAsk(plan) {
     return plan.total > 0;
@@ -360,12 +348,12 @@ export function exerciseQuota(exercises, now = Date.now()) {
 /**
  * The item list for an exercise the reader NAMED, rather than one the plan drew.
  *
- * EVERY NAMED QUESTION IS AN ITEM. There is no `newPerExercise` here, no review
- * window, no shuffle, and none of them may come back later: this function is called
- * once, by the service, immediately before the items are written, and the exercise it
- * produces is the list it returns. Every other way of building an exercise can be
- * re-derived from the goal; this one is a statement the reader made, and the only
- * honest thing to do with it is build exactly it.
+ * EVERY NAMED QUESTION IS AN ITEM. There is no `NEW_PER_EXERCISE` here, no review
+ * window, no shuffle of the questions, and none of them may come back later: this
+ * function is called once, by the service, immediately before the items are
+ * written, and the exercise it produces is the list it returns. Every other way of
+ * building an exercise can be re-derived from the goal; this one is a statement
+ * the reader made, and the only honest thing to do with it is build exactly it.
  *
  * A QUESTION CAN APPEAR IN AS MANY EXERCISES AS THE READER ASKS FOR, and that is what
  * separates this from the plan: the plan asks "what has not been seen lately", so it
@@ -374,11 +362,17 @@ export function exerciseQuota(exercises, now = Date.now()) {
  * pointing at a question, not a column on it, so the same question can be on
  * Tuesday's sheet and Sunday's with the two records independent.
  *
- * THE ORDER IS THE GOAL'S, WHICH MEANS NO SHUFFLE. The plan shuffles fresh questions
- * because they arrived by typing order and a reader who adds twenty at once should not
- * meet them in the order they were typed. Named questions are the opposite case: the
- * reader has already arranged them, on a screen, and reordering them here would make
- * the order they chose invisible while looking exactly like the app being helpful.
+ * THE ORDER OF THE QUESTIONS IS THE GOAL'S, WHICH MEANS NO QUESTION SHUFFLE. The
+ * plan shuffles fresh questions because they arrived by typing order and a reader
+ * who adds twenty at once should not meet them in the order they were typed. Named
+ * questions are the opposite case: the reader has already arranged them, on a
+ * screen, and reordering them here would make the order they chose invisible while
+ * looking exactly like the app being helpful.
+ *
+ * THE OPTIONS ARE SHUFFLED, ONCE, the same way the plan shuffles them. This is a
+ * session like any other, and the one thing every session has in common is that its
+ * options were arranged by the app at freeze time and never move again — see `freeze`
+ * in `buildExercisePlan` for why the order is stored rather than re-derived.
  *
  * THE KIND IS STILL DECIDED, because the result page reports it. A question never
  * asked is `NEW`; one that has been answered is `REVIEW` — including one answered
@@ -392,12 +386,12 @@ export function exerciseQuota(exercises, now = Date.now()) {
  * survivors are.
  *
  * @param {{questions: object[], history: Map<string, object>,
- *          limit?: number}} input
+ *          limit?: number, rand?: () => number}} input
  * @returns {{items: {questionId: string, kind: string, order: number}[],
  *            newCount: number, reviewCount: number, total: number,
  *            truncated: number, names: string[]}}
  */
-export function buildSelectedPlan({ questions, history, limit = LIMITS.EXERCISE_ITEMS_MAX }) {
+export function buildSelectedPlan({ questions, history, limit = LIMITS.EXERCISE_ITEMS_MAX, rand = Math.random }) {
     const kept = [];
     const seen = new Set();
     let skipped = 0;
@@ -420,18 +414,19 @@ export function buildSelectedPlan({ questions, history, limit = LIMITS.EXERCISE_
         // session must be able to answer them without asking the question store at
         // all.
         //
-        // `options` is the list the CALLER read, in the order it was typed. It is
-        // copied option by option rather than stored by reference, and the `isCorrect`
-        // marks are the ones as they are NOW: an exercise built today is graded
-        // against the answer key as it stood when it was built, which is what makes
-        // it a snapshot rather than a live question with a date on it.
+        // `options` is the list the CALLER read, shuffled once here and stored in
+        // that order: the `order` on each option is rewritten to its place in the
+        // shuffled list, and the `isCorrect` marks are the ones as they are NOW — an
+        // exercise built today is graded against the answer key as it stood when it
+        // was built, which is what makes it a snapshot rather than a live question
+        // with a date on it.
         questionText: question.text,
         questionKind: question.kind,
-        options: (question.options ?? []).map((o, i) => ({
+        options: shuffle(question.options ?? [], rand).map((o, i) => ({
             id: o.id,
             text: o.text,
             isCorrect: Boolean(o.isCorrect),
-            order: o.order ?? i
+            order: i
         }))
     }));
 

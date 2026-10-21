@@ -23,8 +23,8 @@ import { SCHEDULE } from "./schedule.js";
 /** What the goal page and the home page do about it.
  *
  *  NO_GOAL          there is no goal. Only the empty state reaches this.
- *  CLOSED           finished, archived, or the plan's own time is up. Nothing new is
- *                   built; everything written is still there and still readable.
+ *  CLOSED           finished or archived. Nothing new is built; everything written is
+ *                   still there and still readable.
  *  NO_MATERIAL      ready, and the goal is pointed at nothing. NOT AN ERROR and not a
  *                   half-made plan: it is a complete plan with nothing attached, and
  *                   the only thing to offer is the decision of what to attach.
@@ -33,24 +33,21 @@ import { SCHEDULE } from "./schedule.js";
  *                   same person as one finishing yesterday's, and the records cannot
  *                   tell them apart.
  *  RESUME_OR_START  ready, nothing open. One button.
- *  WAITING          this goal's interval has not elapsed. It has a date to give.
  *  RATE_LIMITED     this goal has been worked too fast: three exercises of it started
  *                   inside the window, so a fourth would not leave time to do it. It is
  *                   about THIS goal's own exercises and nothing else — a reader with
  *                   three goals is not refused by one they have not opened.
  *
- * WAITING IS CHECKED BEFORE RATE_LIMITED, and it is `schedule.js` that does the
- * ordering; this function only reports what it was told. It is repeated here because
- * the ORDER is part of the answer: a goal waiting for its own interval and a goal over
- * its own cap need two different sentences, and getting them the wrong way round is
- * how a reader is told to wait a window for something that will not have changed. */
+ * WAITING is not in this list. There used to be a "this goal's interval has not
+ * elapsed" action with a date to display, and it is gone with the interval: a plan
+ * without an interval never waits, and nothing else withholds an exercise from a goal
+ * that is open. */
 export const ACTION = {
     NO_GOAL: "no_goal",
     CLOSED: "closed",
     NO_MATERIAL: "no_material",
     RESUME: "resume",
     RESUME_OR_START: "resume_or_start",
-    WAITING: "waiting",
     RATE_LIMITED: "rate_limited"
 };
 
@@ -75,8 +72,7 @@ export function canStart(decision) {
  * @param {object[]} input.open           exercises still in progress, newest first
  * @param {object|null} input.quota       this goal's allowance, from `exerciseQuota` over
  *                                        its own exercises
- * @returns {{action: string, open: object[], dueAt?: number, endsAt?: number,
- *           quota?: object|null, hasMaterial?: boolean}}
+ * @returns {{action: string, open: object[], quota?: object|null, hasMaterial?: boolean}}
  */
 export function goalAction({ plan, materialCount = 0, open = [], quota = null } = {}) {
     const state = plan?.state ?? SCHEDULE.NO_GOAL;
@@ -84,22 +80,17 @@ export function goalAction({ plan, materialCount = 0, open = [], quota = null } 
 
     if (state === SCHEDULE.NO_GOAL) return { ...tail, action: ACTION.NO_GOAL };
 
-    // CLOSED IS ONE ANSWER FOR THREE STATES, deliberately. "This goal is closed" and
-    // "this goal is in the archive" and "this goal's time is up" differ in the WORD on
-    // screen -- and that word comes from `plan.state`, which is carried through -- but
-    // they do not differ in what can be DONE, which is nothing new. Three branches
-    // returning three identical answers is three chances to write one of them as a
-    // refusal that is not.
-    if (state === SCHEDULE.COMPLETED || state === SCHEDULE.ARCHIVED || state === SCHEDULE.EXPIRED) {
-        return { ...tail, action: ACTION.CLOSED, endsAt: plan.endsAt };
-    }
-
-    if (state === SCHEDULE.WAITING) {
-        return { ...tail, action: ACTION.WAITING, dueAt: plan.dueAt, endsAt: plan.endsAt };
+    // CLOSED IS ONE ANSWER FOR TWO STATES, deliberately. "This goal is closed" and
+    // "this goal is in the archive" differ in the WORD on screen -- and that word
+    // comes from `plan.state`, which is carried through -- but they do not differ
+    // in what can be DONE, which is nothing new. (There used to be a third state,
+    // "the plan's time is up", in here; it went with the plan length.)
+    if (state === SCHEDULE.COMPLETED || state === SCHEDULE.ARCHIVED) {
+        return { ...tail, action: ACTION.CLOSED };
     }
 
     if (state === SCHEDULE.RATE_LIMITED) {
-        return { ...tail, action: ACTION.RATE_LIMITED, endsAt: plan.endsAt };
+        return { ...tail, action: ACTION.RATE_LIMITED };
     }
 
     // READY. Three questions left, and they are asked in this order because each one
@@ -117,9 +108,9 @@ export function goalAction({ plan, materialCount = 0, open = [], quota = null } 
     //      decision is "offer both", not "resume".
     //
     //   3. OTHERWISE: one button.
-    if (materialCount === 0) return { ...tail, action: ACTION.NO_MATERIAL, endsAt: plan.endsAt };
-    if (open.length) return { ...tail, action: ACTION.RESUME, endsAt: plan.endsAt };
-    return { ...tail, action: ACTION.RESUME_OR_START, endsAt: plan.endsAt };
+    if (materialCount === 0) return { ...tail, action: ACTION.NO_MATERIAL };
+    if (open.length) return { ...tail, action: ACTION.RESUME };
+    return { ...tail, action: ACTION.RESUME_OR_START };
 }
 
 /**
@@ -133,10 +124,9 @@ export function goalAction({ plan, materialCount = 0, open = [], quota = null } 
  * start looks unavailable.
  *
  * @param {{action: string}} action
- * @returns {"waiting"|"quota"|"no_material"|"closed"|"ready"}
+ * @returns {"quota"|"no_material"|"closed"|"ready"}
  */
 export function stateKey(action) {
-    if (action.action === ACTION.WAITING) return "waiting";
     if (action.action === ACTION.RATE_LIMITED) return "quota";
     if (action.action === ACTION.NO_MATERIAL) return "no_material";
     if (action.action === ACTION.CLOSED) return "closed";

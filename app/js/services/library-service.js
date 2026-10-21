@@ -47,7 +47,7 @@ import { REF_TYPE } from "../domain/goal-content.js";
 import { ValidationError, NotFoundError } from "../domain/errors.js";
 import { listGroups, createGroup } from "../data/repo-groups.js";
 import { listQuestions, createQuestions } from "../data/repo-questions.js";
-import { getGoal, addGoalRefs, listAllGoalRefs } from "../data/repo-goals.js";
+import { getGoal, addGoalRefs, listAllGoalRefs, removeGoalRef } from "../data/repo-goals.js";
 
 /**
  * EVERY JSON FILE IN `app/packs`, as parsed modules.
@@ -260,6 +260,60 @@ export async function addToGoal(packId, goalId) {
         created: created.length,
         reused: plan.reuse.length
     };
+}
+
+/**
+ * Take a ready-made set OFF a goal: every reference pointing this goal at the set's
+ * material, and nothing else.
+ *
+ * WHAT HAS TO GO, AND WHY BOTH HALVES. `list()` counts a goal for a pack through
+ * either of two reference shapes — a reference to one of the pack's questions, or a
+ * reference to a shelf the pack's questions are filed on — so removing only the
+ * question refs would leave the pack's row still saying "used by this goal" when the
+ * goal no longer draws on it (and vice versa). The shelf refs are the ones the reader
+ * wrote themselves by attaching the group on the goal's page, and they are removed too
+ * because they are refs TO THIS SET's material: the goal's relation to this pack is
+ * what the button removes, not the reader's own attachment of a group that happens to
+ * contain the same questions.
+ *
+ * WHAT IS NOT TOUCHED, AND WHY. The questions stay on the device — they are the
+ * reader's copies now, filable, editable, attachable to as many goals as they like —
+ * and the group stays filed. Only the CONNECTION is removed: a goal that stops drawing
+ * on this set loses nothing but the set's questions, which is the honest meaning of
+ * "remove from this goal".
+ *
+ * The goal is read first and refused when it is gone, for the same reason `addToGoal`
+ * refuses on a missing goal: a button that removes material from a plan that no longer
+ * exists is a button about nothing.
+ */
+export async function removeFromGoal(packId, goalId) {
+    const pack = read(packId);
+    const goal = await getGoal(goalId).catch(() => null);
+    if (!goal || goal.deletedAt) throw new NotFoundError("goal", goalId);
+
+    // The pack's questions on THIS device, and the shelves they sit on. A question
+    // that has been re-filed since the pack was added is still this set's — it carries
+    // `packId` — and its new shelf is still where its references point.
+    const [questions, refs] = await Promise.all([listQuestions(), listAllGoalRefs()]);
+    const shelves = new Set(
+        questions
+            .filter((q) => q.packId === pack.id && q.groupId)
+            .map((q) => q.groupId)
+    );
+
+    const mine = refs.filter((ref) => ref.goalId === goalId);
+    const wanted = mine.filter((ref) => {
+        if (ref.refType === REF_TYPE.QUESTION) {
+            return questions.some((q) => q.packId === pack.id && q.id === ref.refId);
+        }
+        if (ref.refType === REF_TYPE.GROUP) return shelves.has(ref.refId);
+        return false;
+    });
+
+    // Each removal is a tombstone write of one row; there are far fewer than a pack's
+    // questions, so per-row is cheaper than a transaction that re-reads the table.
+    await Promise.all(wanted.map((ref) => removeGoalRef(ref.id)));
+    return { removed: wanted.length };
 }
 
 /**

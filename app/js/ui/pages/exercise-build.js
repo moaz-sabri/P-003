@@ -353,7 +353,6 @@ export async function render(ctx) {
  *  asked of the DECISION rather than of `plan`, so the sentence cannot differ from the
  *  one the goal page gave for the same state. */
 function blockedHint(action) {
-    if (action.action === "waiting") return t("build.blocked_waiting");
     if (action.action === "rate_limited") return t("build.blocked_quota");
     return t("build.blocked_other");
 }

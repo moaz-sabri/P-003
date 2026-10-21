@@ -24,14 +24,11 @@
 
 import { h, link } from "../dom.js";
 import { head, card, section } from "../page.js";
-import { field, textInput, textareaInput, numberInput, form, submitButton, row } from "../fields.js";
+import { field, textInput, textareaInput, form, submitButton } from "../fields.js";
 import * as toast from "../toast.js";
 import { t } from "../../i18n/i18n.js";
 import { LIMITS } from "../../domain/validation.js";
 import { stateKey } from "../../domain/goal-action.js";
-import {
-    DEFAULT_DURATION_DAYS, DEFAULT_NEW_PER_EXERCISE, DEFAULT_REVIEW_DEPTH, DEFAULT_INTERVAL_DAYS
-} from "../../config.js";
 import { overviews, goalAction, createGoal, listHistory, goalSlots } from "../../services/goal-service.js";
 import { go } from "../../app/router.js";
 import { setCurrentGoal } from "../nav.js";
@@ -49,7 +46,7 @@ import { setCurrentGoal } from "../nav.js";
  *
  * The form is behind `?new=1` rather than always on the page, so the list is the first
  * thing the screen is for; with three goals on it, a second form below them is a wall
- * of number fields between the reader and the list they came for.
+ * of fields between the reader and the list they came for.
  */
 export async function render(ctx) {
     const wantsNew = ctx?.query?.get("new") === "1";
@@ -178,8 +175,8 @@ function goalRow(row) {
  * The create form on its own, which is what a reader with no goals sees.
  *
  * A goal with nothing attached is finished on creation rather than being a mistake to
- * repair, so this form says what it makes — a name and four numbers — and the next
- * screen is where the reader decides what it trains on.
+ * repair, so this form says what it makes — a name, a description, and the fixed plan
+ * every goal has — and the next screen is where the reader decides what it trains on.
  */
 export function createGoalView() {
     setCurrentGoal(null);
@@ -190,17 +187,14 @@ export function createGoalView() {
 }
 
 /**
- * The create form, carrying the WHOLE PLAN and not just the name.
+ * The create form: the name, the description, and the fixed plan explained.
  *
- * It used to ask for a title and a description and then send neither number, so
- * `validateGoal` filled in the defaults and a reader who wanted "ten new words a
- * day, reviewing the last five exercises" got five and three — with nothing on screen
- * to say the plan existed at all. The plan is the first thing a goal is, and the four
- * numbers are the plan.
- *
- * Each has a hint that says what it actually does rather than what it is called.
- * `reviewDepth` in particular is a multiplier, not a count, and the hint is the only
- * place that says so.
+ * The plan used to be four numbers on this form — new per exercise, review depth,
+ * interval days, duration days — and the goal page carried the same four fields to
+ * edit them. They are constants now (`NEW_PER_EXERCISE` and `REVIEW_DEPTH` in
+ * config.js), the same for every goal, so the form does not ask for them; the line
+ * below the name says what every exercise will be, because that is the one sentence
+ * about the plan a reader at this point needs.
  */
 function createGoalForm() {
     const title = field({
@@ -213,46 +207,6 @@ function createGoalForm() {
         control: textareaInput({ maxlength: LIMITS.TEXT_MAX, rows: 3 })
     });
 
-    // Pre-filled with the defaults, and editable — the same controls the goal page
-    // uses to change them later, so a reader who learns what a number does can set
-    // it here rather than discovering it after a week of exercises.
-    const per = field({
-        labelKey: "goal.field_new_per_exercise",
-        hintKey: "goal.hint_new_per_exercise",
-        control: numberInput({
-            value: DEFAULT_NEW_PER_EXERCISE,
-            min: LIMITS.NEW_PER_EXERCISE_MIN,
-            max: LIMITS.NEW_PER_EXERCISE_MAX
-        })
-    });
-    const depth = field({
-        labelKey: "goal.field_review_depth",
-        hintKey: "goal.hint_review_depth",
-        control: numberInput({
-            value: DEFAULT_REVIEW_DEPTH,
-            min: LIMITS.REVIEW_DEPTH_MIN,
-            max: LIMITS.REVIEW_DEPTH_MAX
-        })
-    });
-    const interval = field({
-        labelKey: "goal.field_interval_days",
-        hintKey: "goal.hint_interval_days",
-        control: numberInput({
-            value: DEFAULT_INTERVAL_DAYS,
-            min: LIMITS.INTERVAL_DAYS_MIN,
-            max: LIMITS.INTERVAL_DAYS_MAX
-        })
-    });
-    const duration = field({
-        labelKey: "goal.field_duration_days",
-        hintKey: "goal.hint_duration_days",
-        control: numberInput({
-            value: DEFAULT_DURATION_DAYS,
-            min: LIMITS.DURATION_DAYS_MIN,
-            max: LIMITS.DURATION_DAYS_MAX
-        })
-    });
-
     const save = submitButton("goal.create_button");
 
     const body = form(async () => {
@@ -260,22 +214,17 @@ function createGoalForm() {
         try {
             const created = await createGoal({
                 title: title.control.value,
-                description: description.control.value,
-                newPerExercise: per.control.value,
-                reviewDepth: depth.control.value,
-                intervalDays: interval.control.value,
-                durationDays: duration.control.value
+                description: description.control.value
             });
             toast.show("toast.goal_created");
             // STRAIGHT TO THE GOAL'S OWN PAGE, and not to a question list.
             //
-            // A goal is a plan, and a plan is finished the moment it has a name and
-            // four numbers. It used to send the reader to a question list scoped to
-            // the new goal, on the reasoning that a goal with no questions opens on a
-            // page with nothing to do — which was true of that list and is not true
-            // now, because questions belong to no goal. The screen that follows a new
-            // goal is the goal itself, which is where an exercise is started and where
-            // its material is attached.
+            // A goal is a plan, and a plan is finished the moment it has a name. It
+            // used to send the reader to a question list scoped to the new goal, on the
+            // reasoning that a goal with no questions opens on a page with nothing to
+            // do — which was true of that list and is not true now, because questions
+            // belong to no goal. The screen that follows a new goal is the goal itself,
+            // which is where an exercise is started and where its material is attached.
             go(`/goal/${encodeURIComponent(created.id)}`);
         } catch (err) {
             save.setBusy(false);
@@ -299,9 +248,7 @@ function createGoalForm() {
         title.node,
         description.node,
         h("h3", { style: { "margin-top": "var(--space-2)" }, text: t("goal.plan_heading") }),
-        row(per, depth),
-        interval.node,
-        duration.node,
+        h("p.small.muted", { text: t("goal.plan_fixed") }),
         save.node
     ));
 

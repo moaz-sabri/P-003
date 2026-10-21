@@ -87,13 +87,19 @@ async function nextGroupOrder() {
 }
 
 /** A group is only ever created by its reader naming it, so there is no default
- * name to fall back to and an unnamed one is refused rather than invented. */
-export async function createGroup({ name }) {
+ * name to fall back to and an unnamed one is refused rather than invented.
+ *
+ * `category` is OPTIONAL and stored by its fixed id (see `GROUP_CATEGORIES` in
+ * domain/validation.js), or `null` for a group that has none. It is data the
+ * group list sorts on and nothing the repository interprets — a group is still a
+ * shelf, and the id is just the label's key. */
+export async function createGroup({ name, category = null }) {
     const device = await currentDeviceId();
     const order = await nextGroupOrder();
     const record = touch({
         id: newId("group"),
         name,
+        category: category ?? null,
         order,
         createdAt: now(),
         deletedAt: null

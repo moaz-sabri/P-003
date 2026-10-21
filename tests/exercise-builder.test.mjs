@@ -1,16 +1,18 @@
 // What goes into the next exercise.
 //
-// The rule with teeth is the review pool: the questions of the last `reviewDepth`
-// exercises, oldest exercise first, capped at a multiple of the new count. The
-// window is the rule, and the two designs it is not are both plausible and both
-// wrong — "everything ever answered wrongly" makes a stuck question permanent
-// and starves everything behind it while a question answered correctly can never
-// be seen again, and "any question with a wrong answer in the last N exercises"
-// makes the same three questions come back every single time and never reaches the
-// rest of the material.
+// The plan is the two constants in config.js: an exercise introduces
+// `NEW_PER_EXERCISE` new questions and reviews the last `REVIEW_DEPTH` exercises
+// it drew from, so the exercise grows by the review depth's worth of new items
+// each round and then settles there: 10, 20, 30, and then a steady 30.
 //
-// The worked example in the goal's own description is the test that matters:
-// 5 new per exercise reviewing the last 3 gives 5, 10, 15, 20, and then 20.
+// The rule with teeth is the review window: the questions of the last
+// `REVIEW_DEPTH` exercises, oldest exercise first, capped at a multiple of the
+// new count. The window is the rule, and the two designs it is not are both
+// plausible and both wrong — "everything ever answered wrongly" makes a stuck
+// question permanent and starves everything behind it while a question answered
+// correctly can never be seen again, and "any question with a wrong answer in
+// the last N exercises" makes the same three questions come back every single
+// time and never reaches the rest of the material.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -39,7 +41,7 @@ import {
 } from "../app/js/domain/goal-content.js";
 import { LIMITS } from "../app/js/domain/validation.js";
 import {
-    DEFAULT_NEW_PER_EXERCISE, DEFAULT_REVIEW_DEPTH,
+    NEW_PER_EXERCISE, REVIEW_DEPTH,
     EXERCISE_WINDOW_DAYS, MAX_EXERCISES_PER_WINDOW
 } from "../app/js/config.js";
 
@@ -82,14 +84,13 @@ test("a question with no attempt is new, one answered right is learned", () => {
 
 /* ------------------------------ the window -------------------------------- */
 
-test("the window is the last `reviewDepth` exercises, oldest first, de-duplicated", () => {
-    const goal = { reviewDepth: 3 };
+test("the window is the last `REVIEW_DEPTH` exercises, oldest first, de-duplicated", () => {
     const window = reviewWindow([
         exerciseItems("a", "b"),
         exerciseItems("b", "c"),
         exerciseItems("d"),
         exerciseItems("e", "f")
-    ], goal);
+    ]);
 
     // The last THREE exercises are items 2, 3 and 4. `a` has fallen out of the
     // window, which is the point of a window; `b` was in two of them and is listed
@@ -99,44 +100,43 @@ test("the window is the last `reviewDepth` exercises, oldest first, de-duplicate
 });
 
 test("the window is a number of exercises, not a number of questions", () => {
-    // 2 exercises of 5 questions each is a window of ten, not of two. Reading the
-    // depth as a count of items is what made an exercise shrink back to the new
-    // count the moment the reader had answered everything correctly.
-    const wide = reviewWindow([exerciseItems("a", "b", "c", "d", "e")], { reviewDepth: 5 });
-    assert.deepEqual(wide, ["a", "b", "c", "d", "e"]);
-
-    // A depth of 1 is the previous exercise only, however many questions it held.
-    assert.deepEqual(
-        reviewWindow([exerciseItems("a", "b", "c"), exerciseItems("d")], { reviewDepth: 1 }),
-        ["d"]
-    );
+    // `REVIEW_DEPTH` exercises of however many questions each is a window of their
+    // items, not of three items. Reading the depth as a count of items is what made
+    // an exercise shrink back to the new count the moment the reader had answered
+    // everything correctly.
+    const wide = reviewWindow([
+        exerciseItems("old"),
+        exerciseItems("a", "b", "c", "d", "e"),
+        exerciseItems("f"),
+        exerciseItems("g", "h", "i", "j")
+    ]);
+    // The 4th-back exercise is out, and everything the newest three held is in,
+    // without regard to how many questions each one had.
+    assert.deepEqual(wide, ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]);
 });
 
 test("a goal with no exercises has an empty window", () => {
-    assert.deepEqual(reviewWindow([], { reviewDepth: 3 }), []);
-    assert.deepEqual(reviewWindow(undefined, { reviewDepth: 3 }), []);
+    assert.deepEqual(reviewWindow([]), []);
+    assert.deepEqual(reviewWindow(undefined), []);
 });
 
-/* ------------------------------ the 5/10/15/20 ------------------------------ */
+/* ------------------------------ the 10/20/30 ------------------------------ */
 
-test("5 new reviewing the last 3 exercises gives 5, then 10, then 15, then 20", () => {
-    // The example the goal description gives, run end to end. A pool of "questions
+test("ten new reviewing the last three exercises gives 10, then 20, then a steady 30", () => {
+    // The plan the constants describe, run end to end. A pool of "questions
     // answered wrongly" cannot produce it at all: answer everything correctly and
-    // exercise 2 is 5 items, because nothing is eligible for review any more.
-    const goal = { newPerExercise: 5, reviewDepth: 3, intervalDays: 1 };
+    // exercise 2 is 10 items, because nothing is eligible for review any more.
     const pool = questions(...Array.from({ length: 30 }, (_, i) => `q${i}`));
 
-    let asked = [];              // ids not yet used as new
-    let history_ = new Map();    // every id answered correctly, as they leave `asked`
-    const window = [];           // items of the last three exercises
+    let history_ = new Map();    // every id answered correctly, as they leave the pool
+    const window = [];           // items of the last REVIEW_DEPTH exercises
     const totals = [];
 
     for (let round = 0; round < 6; round++) {
         const plan = buildExercisePlan({
-            goal,
             questions: pool,
             history: history_,
-            recent: reviewWindow(window, goal),
+            recent: reviewWindow(window),
             rand: seeded(round + 1)
         });
         totals.push(plan.total);
@@ -146,16 +146,15 @@ test("5 new reviewing the last 3 exercises gives 5, then 10, then 15, then 20", 
         assert.equal(new Set(ids).size, ids.length, `round ${round} repeated a question`);
 
         window.push(exerciseItems(...ids));
-        if (window.length > 3) window.shift();
+        if (window.length > REVIEW_DEPTH) window.shift();
         for (const id of ids) history_.set(id, { id: `a-${id}`, questionId: id, correct: true, answeredAt: round });
     }
 
-    assert.deepEqual(totals, [5, 10, 15, 20, 20, 20]);
+    assert.deepEqual(totals, [10, 20, 30, 30, 30, 30]);
 });
 
 test("a question answered correctly is still reviewed; one answered wrongly is not new", () => {
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 2, reviewDepth: 3 },
         questions: questions("n1", "n2", "known", "missed"),
         history: history([["known", true, 1], ["missed", false, 2]]),
         recent: ["known", "missed"],
@@ -174,7 +173,6 @@ test("a question answered correctly is still reviewed; one answered wrongly is n
 
 test("the review order is the window's order, and the window is not shuffled", () => {
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 1, reviewDepth: 6 },
         questions: questions("a", "b", "c", "d"),
         history: history([["a", true, 1], ["b", true, 2], ["c", true, 3], ["d", true, 4]]),
         // Oldest exercise first: `a` has gone longest without being seen, so it is
@@ -186,7 +184,6 @@ test("the review order is the window's order, and the window is not shuffled", (
     assert.deepEqual(plan.items.map((i) => i.questionId), ["a", "b", "c", "d"]);
 
     const reversed = buildExercisePlan({
-        goal: { newPerExercise: 1, reviewDepth: 6 },
         questions: questions("a", "b", "c", "d"),
         history: history([["a", true, 4000], ["b", true, 3000], ["c", true, 2000], ["d", true, 1000]]),
         recent: ["d", "c", "b", "a"],
@@ -200,14 +197,12 @@ test("two devices with the same records build the same exercise", () => {
     // different exercises from the same state. Nothing in the review half is
     // random and nothing in it is sorted afterwards.
     const first = buildExercisePlan({
-        goal: { newPerExercise: 1, reviewDepth: 6 },
         questions: questions("b", "a", "c"),
         history: history([["b", true, 500], ["a", true, 500]]),
         recent: ["b", "a"],
         rand: seeded()
     });
     const second = buildExercisePlan({
-        goal: { newPerExercise: 1, reviewDepth: 6 },
         questions: questions("a", "b", "c"),
         history: history([["a", true, 500], ["b", true, 500]]),
         recent: ["b", "a"],
@@ -220,29 +215,19 @@ test("two devices with the same records build the same exercise", () => {
     assert.deepEqual(first.items.map((i) => i.kind), [ITEM_KIND.NEW, ITEM_KIND.REVIEW, ITEM_KIND.REVIEW]);
 });
 
-test("the review cap is a multiple of the new count, not a fixed number", () => {
-    // 5 new × depth 3 = 15. The failure this prevents is a goal asking for 5 new
-    // and 15 reviews being given 20 reviews, which is twice the reading for the
-    // same return — and reviewDepth 3 meaning "three items" rather than "three
-    // times as much", which makes a goal with 20 new ask for 60 reviews.
-    assert.equal(reviewCapacity({ newPerExercise: 5, reviewDepth: 3 }), 15);
-    assert.equal(reviewCapacity({ newPerExercise: 2, reviewDepth: 3 }), 6);
-    assert.equal(reviewCapacity({ newPerExercise: 20, reviewDepth: 1 }), 20);
-
-    // Absurd values are clamped rather than obeyed: the numbers come from a synced
-    // record, and one device's out-of-range value must not be able to build a
-    // thousand-item exercise on another.
-    assert.equal(reviewCapacity({ newPerExercise: 9999, reviewDepth: 9999 }),
-        LIMITS.NEW_PER_EXERCISE_MAX * LIMITS.REVIEW_DEPTH_MAX);
-    assert.equal(reviewCapacity({}), Math.ceil(DEFAULT_NEW_PER_EXERCISE * DEFAULT_REVIEW_DEPTH));
-    assert.equal(reviewCapacity(null), Math.ceil(DEFAULT_NEW_PER_EXERCISE * DEFAULT_REVIEW_DEPTH));
+test("the review cap is the fixed multiple of the new count", () => {
+    // 10 new × depth 3 = 30. The failure this prevents is a goal asking for ten
+    // new being given twenty reviews, which is twice the reading for the same
+    // return — and review depth 3 meaning "three items" rather than "three times
+    // as much" is the mistake the multiple is drawn against.
+    assert.equal(reviewCapacity(), Math.ceil(NEW_PER_EXERCISE * REVIEW_DEPTH));
+    assert.equal(reviewCapacity(), 30);
 });
 
 /* -------------------------------- the plan -------------------------------- */
 
 test("a plan holds the new count first, then the review count", () => {
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 4, reviewDepth: 2 },
         questions: questions("n1", "n2", "n3", "n4", "r1", "r2"),
         history: history([["r1", true, 10], ["r2", true, 20]]),
         recent: ["r1", "r2"],
@@ -274,7 +259,6 @@ test("a question is never both new and reviewed in one exercise", () => {
     // is a question asked twice in one session, counted twice and reported as two
     // answers.
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 20, reviewDepth: 6 },
         questions: questions("a", "b", "c"),
         // `a` is in the window AND would be new if the window were ignored.
         history: history([["b", true], ["c", true]]),
@@ -288,7 +272,6 @@ test("a question is never both new and reviewed in one exercise", () => {
 
 test("a question in the window that has been deleted is dropped, not asked", () => {
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 5, reviewDepth: 3 },
         questions: questions("alive"),
         history: history([["alive", true, 1]]),
         recent: ["gone", "alive"],
@@ -300,42 +283,28 @@ test("a question in the window that has been deleted is dropped, not asked", () 
 });
 
 test("a plan reports what it had to leave behind", () => {
-    // The goal screen says "17 more new" and "9 more to review", and a number that
+    // The goal screen says "12 more new" and "5 more to review", and a number that
     // quietly reads 0 because the pool was capped is a goal that looks finished.
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 2, reviewDepth: 1 },
-        questions: questions(...Array.from({ length: 5 }, (_, i) => `n${i}`), "r1", "r2", "r3"),
-        history: history([["r1", false], ["r2", false], ["r3", false]]),
-        recent: ["r1", "r2", "r3"],
+        questions: questions(
+            ...Array.from({ length: 12 }, (_, i) => `n${i}`),
+            "r1", "r2", "r3", "r4", "r5"
+        ),
+        history: history([["r1", false], ["r2", false], ["r3", false], ["r4", false], ["r5", false]]),
+        recent: ["r1", "r2", "r3", "r4", "r5"],
         rand: seeded()
     });
-    assert.equal(plan.newCount, 2);
-    assert.equal(plan.reviewCount, 2);   // ceil(2 × 1)
-    assert.equal(plan.freshLeft, 3);
-    assert.equal(plan.reviewLeft, 3);    // three not learned, two of which fitted
-    assert.equal(plan.total, 4);
-});
-
-test("an emptied number on the goal is the default, not the minimum", () => {
-    // `Number("")` is 0, so a field the reader cleared and saved used to be
-    // clamped up to the minimum: "5 new per exercise" became 1, with no error and
-    // nothing on the goal page to show it.
-    const plan = buildExercisePlan({
-        goal: { newPerExercise: "", reviewDepth: "  " },
-        questions: questions("a", "b", "c", "d", "e", "f", "g"),
-        history: new Map(),
-        rand: seeded()
-    });
-    assert.equal(plan.newCount, DEFAULT_NEW_PER_EXERCISE);
-    assert.equal(reviewCapacity({ newPerExercise: "", reviewDepth: "" }),
-        Math.ceil(DEFAULT_NEW_PER_EXERCISE * DEFAULT_REVIEW_DEPTH));
+    assert.equal(plan.newCount, 10);
+    assert.equal(plan.reviewCount, 5);   // all five fit under the cap of 30
+    assert.equal(plan.freshLeft, 2);
+    assert.equal(plan.reviewLeft, 5);    // five not learned, all five of them asked
+    assert.equal(plan.total, 15);
 });
 
 test("an empty goal has nothing to ask, and says so before opening an exercise", () => {
-    // Opening a zero-item exercise would finish instantly, stamp `completedAt`,
-    // and lock the goal for a whole interval having rehearsed nothing.
+    // Opening a zero-item exercise would finish instantly and count as a completed
+    // session having rehearsed nothing.
     const plan = buildExercisePlan({
-        goal: { newPerExercise: 5, reviewDepth: 3 },
         questions: [],
         history: new Map(),
         rand: seeded()
@@ -343,7 +312,6 @@ test("an empty goal has nothing to ask, and says so before opening an exercise",
     assert.equal(plan.total, 0);
     assert.ok(!hasAnythingToAsk(plan));
     assert.ok(hasAnythingToAsk(buildExercisePlan({
-        goal: { newPerExercise: 5 },
         questions: questions("a"),
         history: new Map(),
         rand: seeded()
@@ -497,7 +465,6 @@ test("the order is the reader's own, whatever order things were attached in", ()
 });
 
 test("a group selection feeds the plan, and the plan asks for nothing outside it", () => {
-    const goal = { id: "g1", newPerExercise: 2, reviewDepth: 2 };
     const filed = [
         { id: "a", groupId: "g1" },
         { id: "b", groupId: "g2" },
@@ -506,13 +473,14 @@ test("a group selection feeds the plan, and the plan asks for nothing outside it
     ];
     const chosen = questionsForGoal({ groups: [{ id: "g1" }], allQuestions: filed });
     const plan = buildExercisePlan({
-        goal,
         questions: chosen,
         history: new Map(),
         recent: [],
         rand: seeded(7)
     });
-    assert.equal(plan.total, 2, "the plan built more than the group asked for");
+    // All three group questions are fresh and the new-item count is ten, so the
+    // whole selection fits: three asked, nothing from outside.
+    assert.equal(plan.total, 3, "the plan built more than the group asked for");
     for (const item of plan.items) {
         assert.ok(item.questionId !== "b",
             "the exercise asked a question from a group that was not picked");
@@ -596,9 +564,8 @@ test("an empty selection is the whole goal, not an empty exercise", () => {
 
 test("a named exercise asks every question that was named, past the new-item cap", () => {
     // The cap that shapes a PLANNED exercise does not apply here. A reader who ticks
-    // eight questions with `newPerExercise` at 5 asked for eight, and being given five
-    // is an exercise they did not choose.
-    const goal = { id: "g1", newPerExercise: 5, reviewDepth: 3 };
+    // eight questions asked for eight, and being given ten is an exercise they did
+    // not choose.
     const all = questions("a", "b", "c", "d", "e", "f", "g", "h");
     const plan = buildSelectedPlan({
         questions: questionsForSelection(all, { questionIds: all.map((q) => q.id) }),
@@ -791,8 +758,9 @@ const started = (daysAgo, number = 1) => ({
 
 test("the cap is generous enough to be a cap and not a wall", () => {
     // A cap of one or two reads as a bug rather than a rule, and it would
-    // contradict the one-day interval sitting next to it: a reader told to come
-    // back tomorrow and then refused tomorrow has been told two things.
+    // contradict the pace the two-day window promises: a reader who finishes a
+    // session one evening and comes back after a day off has done the thing the
+    // plan is for, and a cap of one would refuse exactly that return.
     assert.equal(MAX_EXERCISES_PER_WINDOW, 3);
     assert.equal(EXERCISE_WINDOW_DAYS, 2);
 });

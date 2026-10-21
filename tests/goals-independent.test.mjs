@@ -146,7 +146,7 @@ test("a goal with nothing attached is a complete plan, and asking it for materia
     // all there, and what is missing is a decision. So the empty case has to be an
     // empty LIST and the pages have to say so with a link rather than an error.
     const all = Array.from({ length: 40 }, (_, i) => q(`q${i}`));
-    const goal = { id: "g1", newPerExercise: 5, reviewDepth: 3 };
+    const goal = { id: "g1" };
 
     const material = questionsForGoal({ groups: [], questionIds: [], allQuestions: all });
     assert.equal(material.length, 0);
@@ -165,17 +165,17 @@ test("a goal with nothing attached is a complete plan, and asking it for materia
 
 test("the session's questions are decided once, and the set does not change afterwards", async () => {
     // The specification's own example, made mechanical: a goal holds a large number of
-    // questions, the setting allows five in a session, the session uses five, and the
-    // reader may repeat those five for as long as they like — but no new question can
+    // questions, an exercise introduces ten new ones, the session uses ten, and the
+    // reader may repeat those ten for as long as they like — but no new question can
     // enter the session that is already running.
-    const goal = { id: "g1", newPerExercise: 5, reviewDepth: 1 };
+    const goal = { id: "g1" };
     const all = Array.from({ length: 50 }, (_, i) => q(`q${i}`, i < 20 ? "g1" : null));
     const material = questionsForGoal({ groups: [group("g1")], allQuestions: all });
 
     const first = buildExercisePlan({
         goal, questions: material, history: new Map(), recent: []
     });
-    assert.equal(first.total, 5, "the setting was not honoured");
+    assert.equal(first.total, 10, "the plan's ten new questions were not asked");
 
     // THE ITEMS ARE THE SESSION. Each carries its own copy of the question, so the
     // question store is never consulted for what this session asks — which is what makes
@@ -228,7 +228,7 @@ test("repeating inside a session is a repeat of the same question, never a new o
     // "تكرار الأسئلة داخل الجلسة" — a wrong answer puts the item at the back of the
     // queue for another round. It does not put a sixth question into a five-question
     // session, and the count on the progress bar stays the count.
-    const goal = { id: "g1", newPerExercise: 5, reviewDepth: 1 };
+    const goal = { id: "g1" };
     const material = Array.from({ length: 5 }, (_, i) => q(`q${i}`, "g1"));
     const plan = buildExercisePlan({ goal, questions: material, history: new Map(), recent: [] });
     assert.equal(plan.total, 5);
@@ -264,7 +264,6 @@ test("a question deleted mid-session does not take a slot out of it", async () =
     // tombstone the item, so deleting one question silently shortened the session the
     // reader was in the middle of and the progress bar stopped matching what was asked.
     // Now the item carries its own copy and the deletion reaches only the question.
-    const goal = { id: "g1", newPerExercise: 3, reviewDepth: 1 };
     const material = [q("a"), q("b"), q("c")];
     const plan = buildSelectedPlan({
         questions: material, history: new Map(), limit: 10

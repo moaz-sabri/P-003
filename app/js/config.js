@@ -26,24 +26,14 @@ export const IDENTITY_VERSION = 1;
 
 /* ------------------------------- the plan ------------------------------- */
 
-// The defaults a goal form starts with. They are DEFAULTS and nothing else: the
-// numbers are read from the goal record on every exercise, so changing them
-// here changes what a new goal proposes and never what an existing one does.
-export const DEFAULT_NEW_PER_EXERCISE = 5;
-export const DEFAULT_REVIEW_DEPTH = 3;
-export const DEFAULT_INTERVAL_DAYS = 1;
-
-/**
- * How long a goal lasts, in days, when the form does not say otherwise.
- *
- * A goal is meant to be finished rather than kept forever — "learn 300 words in
- * three months" is a plan with an end — and the end is what stops the app asking
- * the same five questions for a year. Ninety days is the default because it is
- * long enough to see whether the plan is working and short enough that finishing
- * is a thing that happens. It is NOT a lock: a goal that runs out says so and
- * keeps everything, and the reader closes it and starts the next one.
- */
-export const DEFAULT_DURATION_DAYS = 90;
+// The plan every goal is built on. These used to be numbers a goal form let the
+// reader change, and they are constants now: an exercise always introduces ten
+// new questions and always reviews the last three it drew from, because two fixed
+// numbers are one less decision per goal and one less plan to display. The plan
+// section of a goal page reads them from here rather than from the record, so
+// there is nowhere for a per-goal value to drift.
+export const NEW_PER_EXERCISE = 10;
+export const REVIEW_DEPTH = 3;
 
 /** How long before a backup file is considered stale, in days. */
 export const BACKUP_REMINDER_DAYS = 30;
@@ -71,9 +61,8 @@ export const BACKUP_REMINDER_DAYS = 30;
  *
  * THREE IN TWO DAYS. Two is a real number rather than a round one, and it is the
  * smallest number that lets a reader finish a session on one evening and start the
- * next one after a day off — which is what `DEFAULT_INTERVAL_DAYS = 1` already
- * invites them to do. A cap of one would contradict the interval it sits beside.
- */
+ * next one after a day off — which is the pace an exercise is meant to run at. A
+ * cap of one would contradict that. */
 export const MAX_EXERCISES_PER_WINDOW = 3;
 
 /** The window those three are counted over. A SLIDING window, not a calendar day:

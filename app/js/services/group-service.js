@@ -59,7 +59,7 @@ export async function create(draft) {
     const existing = await listGroups();
     const result = validateGroup(draft, existing.map((g) => g.name));
     if (!result.ok) return { ok: false, errors: result.errors };
-    const group = await createGroupRecord({ name: result.values.name });
+    const group = await createGroupRecord({ name: result.values.name, category: result.values.category });
     return { ok: true, group };
 }
 

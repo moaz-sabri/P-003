@@ -32,7 +32,7 @@ import { withTx } from "./db.js";
 import { STORE } from "./stores.js";
 import { newId } from "../domain/id.js";
 import { NotFoundError } from "../domain/errors.js";
-import { addDays, now } from "../domain/time.js";
+import { now } from "../domain/time.js";
 import { currentDeviceId, touch, under, live } from "./repo-core.js";
 import { openExercises } from "../domain/schedule.js";
 
@@ -68,13 +68,6 @@ export async function listExercises(goalId) {
  * was, which is what "the current session is a fixed snapshot" has to mean if it is
  * to mean anything at all.
  *
- * `dueAt` is decided HERE, at creation, and never recomputed. The interval is read
- * from the goal record, which the reader can change at any time; if the due date
- * were derived at the moment the exercise finished, a goal whose interval was
- * widened mid-exercise would retroactively unlock its next exercise differently on
- * each device. The page and the schedule both derive their answer instead — see
- * `exerciseDueAt` in domain/schedule.js.
- *
  * `groupIds`, `questionIds` AND `excludeIds` ARE THE READER'S SELECTION, kept as a
  * record of what they asked for rather than as an input to anything. The items are
  * what make the exercise; these three say WHY those items are what they are, which is
@@ -83,9 +76,13 @@ export async function listExercises(goalId) {
  * nothing was named, as `null` rather than absent, so a reader who opens a past
  * exercise and sees an empty selection is told the plan built it rather than being
  * left to guess.
+ *
+ * (There used to be a `dueAt` written here — the next exercise's unlock date,
+ * computed from an `intervalDays` the goal no longer has. The interval is gone,
+ * so the date is gone with it; an exercise record carries no schedule of its own.)
  */
 export async function createExercise({
-    goalId, number, items, intervalDays,
+    goalId, number, items,
     groupIds = null, questionIds = null, excludeIds = null
 }) {
     const device = await currentDeviceId();
@@ -99,11 +96,6 @@ export async function createExercise({
         groupIds: Array.isArray(groupIds) ? groupIds.slice() : null,
         questionIds: Array.isArray(questionIds) ? questionIds.slice() : null,
         excludeIds: Array.isArray(excludeIds) ? excludeIds.slice() : null,
-        // Calendar days, through domain/time's addDays — not `at + n*86400000`.
-        // An exercise unlocked by adding a day's milliseconds lands an hour early
-        // or late twice a year, and the reader cannot tell that from "the app is
-        // broken".
-        dueAt: addDays(at, intervalDays),
         completedAt: null,
         deletedAt: null
     }, device);

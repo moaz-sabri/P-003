@@ -57,11 +57,10 @@ const NOW = Date.UTC(2026, 5, 1);
 /** Days after NOW, in ms. `day(n)` is "n days from the reference point". */
 const day = (n) => NOW + n * 86_400_000;
 
-/** A goal. `durationDays` is long by default so that a fixture is not silently EXPIRED
- *  in a test about something else; the expiry test overrides it. */
+/** A goal. The plan is the fixed pair of constants, so a fixture needs nothing more
+ *  than a title and a status — the only per-goal fields the schedule reads. */
 const goal = (over = {}) => ({
     id: "g1", title: "French", status: "active", archivedAt: null,
-    newPerExercise: 5, reviewDepth: 3, intervalDays: 1, durationDays: 3650,
     createdAt: day(-30), ...over
 });
 
@@ -316,39 +315,13 @@ test("nothing open and something to ask is one button", () => {
     assert.equal(canStart(action), true);
 });
 
-test("waiting is checked before the rate cap, and the two read differently", () => {
-    // A goal that is BOTH waiting for its own interval and over the device cap must
-    // say so about its interval: it has a date, the cap's date is about other goals,
-    // and telling a reader to wait a day for something that will not have changed is
-    // the failure the ordering exists to prevent.
-    const blocked = quota({ used: 3, limit: 3, remaining: 0, blocked: true, retryAt: day(1) });
-    const justFinished = { ...exercise(1), completedAt: day(0) };
-
-    const both = planSchedule({ goal: goal(), exercises: [justFinished], quota: blocked, now: NOW });
-    assert.equal(both.state, SCHEDULE.WAITING, "planSchedule must report WAITING when both apply");
-    const action = goalAction({ plan: both, materialCount: 10, open: [], quota: blocked });
-    assert.equal(action.action, ACTION.WAITING);
-    assert.ok(action.dueAt > NOW);
-    assert.equal(stateKey(action), "waiting");
-
-    // The cap alone, on a goal whose interval has elapsed.
-    const elapsed = planSchedule({
-        goal: goal(), exercises: [justFinished],
-        quota: blocked, now: day(3)
-    });
-    assert.equal(elapsed.state, SCHEDULE.RATE_LIMITED);
-    assert.equal(stateKey(goalAction({ plan: elapsed, materialCount: 10, open: [], quota: blocked })), "quota");
-});
-
-test("finished, archived and expired are one answer with three words", () => {
+test("finished and archived are one answer with two words", () => {
     // They differ in the SENTENCE and agree in what can be DONE, which is nothing new.
-    // Three branches returning three identical answers is three chances to write one of
+    // Two branches returning two identical answers is two chances to write one of
     // them as a refusal it is not.
     const cases = [
         [planSchedule({ goal: goal({ status: "completed", completedAt: day(-1) }), exercises: [], quota: quota(), now: NOW }), "completed"],
-        [planSchedule({ goal: goal({ archivedAt: day(-1) }), exercises: [], quota: quota(), now: NOW }), "archived"],
-        // A one-week plan started five weeks ago: the calendar, not the reader, ended it.
-        [planSchedule({ goal: goal({ createdAt: day(-35), durationDays: 7 }), exercises: [], quota: quota(), now: NOW }), "expired"]
+        [planSchedule({ goal: goal({ archivedAt: day(-1) }), exercises: [], quota: quota(), now: NOW }), "archived"]
     ];
     for (const [plan, label] of cases) {
         const action = goalAction({ plan, materialCount: 40, open: [], quota: quota() });
@@ -373,20 +346,16 @@ test("a closed goal with an exercise still open is not stranded", () => {
 
 test("an open exercise can be resumed whatever the state is", () => {
     // THE RESUME BUTTON IS DRAWN ABOVE THE STATE, NOT INSIDE ONE BRANCH OF IT, and this
-    // is the property that says so. Waiting for the interval and being over the rate cap
-    // are refusals to BUILD something new; neither is a reason a reader cannot finish the
-    // one they already started — and a reader whose goal opens tomorrow morning is
-    // exactly the person most likely to have something half-finished tonight.
+    // is the property that says so. Being over the rate cap is a refusal to BUILD
+    // something new; it is not a reason a reader cannot finish the one they already
+    // started — and a reader whose goal has been worked hard this window is exactly
+    // the person most likely to have something half-finished tonight.
     //
-    // It was drawn in three of the six branches and not the other two, so the home page
-    // said "not yet" with no way through, while the goal page's list offered the same
+    // It used to be drawn in some branches and not others, so the home page said
+    // "not yet" with no way through, while the goal page's list offered the same
     // exercise with a Continue button on it. Two screens, one decision, two answers.
     const open = [exercise(2), exercise(1)];
     const cases = [
-        ["waiting", planSchedule({
-            goal: goal(), exercises: [{ ...exercise(3), completedAt: day(0) }],
-            quota: quota(), now: NOW
-        })],
         ["rate_limited", planSchedule({
             goal: goal(), exercises: open,
             quota: quota({ used: 3, limit: 3, remaining: 0, blocked: true, retryAt: day(1) }),
@@ -412,7 +381,7 @@ test("an open exercise can be resumed whatever the state is", () => {
             `${label} reported different open exercises`);
         seen.add(action.action);
     }
-    // Five distinct decisions out of six cases, which is the point: these are genuinely
+    // Four distinct decisions out of five cases, which is the point: these are genuinely
     // different states that must all still carry the same two records.
     assert.ok(seen.size >= 4, `only ${seen.size} distinct decisions were exercised`);
 });

@@ -12,12 +12,13 @@
 // something the decision did not account for.
 //
 // IT RETURNS A `destroy` WHEN IT PAINTS A CLOCK, and every thirty seconds rather than
-// every second. A waiting goal says "opens in 1 day" and a goal over its own cap says
-// "the next one opens in 3 hours"; both are painted once and left alone on a timer
-// that never fires, and the reader concludes the app has stopped counting. Nothing on
-// these lines is worth waking a phone for more often than half a minute, and a
-// countdown that visibly ticks every second invites taps on a button that is disabled
-// anyway.
+// every second. The one clock left in this file is the rate cap's — "the next slot
+// frees in 3 hours" — and it is painted once and left alone on a timer that never
+// fires, so the reader does not conclude the app has stopped counting. (There used to
+// be a second clock, the interval's "opens in 1 day", and it went with the interval.)
+// Nothing on these lines is worth waking a phone for more often than half a minute,
+// and a countdown that visibly ticks every second invites taps on a button that is
+// disabled anyway.
 
 import { h, link } from "../dom.js";
 import { t, formatCountdown } from "../../i18n/i18n.js";
@@ -76,13 +77,12 @@ export function goalActions({ goal, action, compact = false }) {
 
     // THE OPEN EXERCISES ARE OFFERED IN EVERY BRANCH THAT CAN HAVE THEM.
     //
-    // Waiting for the interval and being over the rate cap are refusals to BUILD
-    // something new. Neither is a reason a reader cannot finish the one they already
-    // started — and a reader whose goal opens tomorrow morning is exactly the person
-    // most likely to have something half-finished tonight. The decision already carries
-    // `open`; drawing it in three of the six branches and not the other two meant the
-    // home page said "not yet" with no way through while the goal page listed the same
-    // exercise with a Continue button on it.
+    // Being over the rate cap is a refusal to BUILD something new; it is not a reason
+    // a reader cannot finish the one they already started — and a reader whose goal
+    // is capped is exactly the person most likely to have something half-finished
+    // tonight. The decision already carries `open`; drawing it in some branches and
+    // not others meant the home page said "not yet" with no way through while the goal
+    // page listed the same exercise with a Continue button on it.
     //
     // Newest first, because that is the one they most likely want.
     for (const exercise of action.open ?? []) {
@@ -124,34 +124,13 @@ export function goalActions({ goal, action, compact = false }) {
                 { class: "btn btn-secondary btn-block" }));
             break;
 
-        case ACTION.WAITING: {
-            // The countdown is a NODE. The sentence has no `{time}` and no trailing
-            // full stop for the same reason the result page's does not: the value used
-            // to be interpolated as an empty placeholder and the period that followed it
-            // was left stranded in front of a number that arrived after it, which
-            // printed "opens in . 23h 59m" on the one screen whose whole job is to say
-            // when the reader may come back.
-            const countdown = h("span.nums");
-            const paint = () => { countdown.textContent = formatCountdown(remaining(action.dueAt)); };
-            paint();
-            timers.push(setInterval(paint, 30_000));
-
-            body.appendChild(h("p", null, t("home.locked_body"), " ", countdown));
-            body.appendChild(h("button.btn.btn-block", {
-                type: "button",
-                disabled: true,
-                "aria-disabled": "true"
-            }, t("home.locked_heading")));
-            break;
-        }
-
         case ACTION.RATE_LIMITED: {
-            // The rate cap. Its own button and its own sentence, because it is not the
-            // same thing as the goal's interval: this goal's interval has elapsed and
-            // this goal has been started three times in the last two days. It counts
-            // this goal's own exercises only, so a reader with three goals is not
-            // refused by one they have not opened — which is what the wording below
-            // says, and what it would not say if the cap were shared.
+            // The rate cap. Its own button and its own sentence, because refusing on
+            // the rate is not the same as anything else the goal can say: this goal
+            // has been started three times in the last two days. It counts this goal's
+            // own exercises only, so a reader with three goals is not refused by one
+            // they have not opened — which is what the wording below says, and what it
+            // would not say if the cap were shared.
             const quota = action.quota ?? {};
             body.appendChild(h("p.small.muted", {
                 text: t("home.quota_line", {
@@ -203,8 +182,8 @@ export function goalActions({ goal, action, compact = false }) {
     // THE ALLOWANCE, ALWAYS, and only on the block that offers a Start. It is the one
     // number a reader can act on before being refused, and it is only meaningful while
     // there is still something left -- a reader who sees "1 of 3" knows to start the
-    // one they want rather than the one they happened to open. A goal that is waiting
-    // or over the cap has nothing to act on here; its own sentence is above.
+    // one they want rather than the one they happened to open. A goal over the cap has
+    // nothing to act on here; its own sentence is above.
     const quota = action.quota;
     if (action.action === ACTION.RESUME || action.action === ACTION.RESUME_OR_START) {
         body.appendChild(h("div.small.muted", {
@@ -230,10 +209,10 @@ export function goalActions({ goal, action, compact = false }) {
  * derived from nothing the reader can see, so the service's idempotence cannot help,
  * and the quota would spend twice for one intention.
  *
- * A REFUSAL REDRAWS rather than explaining. `too_soon` and `too_many_exercises` mean
- * this page was out of date -- another tab finished something, or another goal spent
- * a slot -- and the honest repair is to re-read the decision, not to describe the rule
- * that changed underneath it.
+ * A REFUSAL REDRAWS rather than explaining. `too_many_exercises` means this page was
+ * out of date -- another tab finished something, or another goal spent a slot -- and
+ * the honest repair is to re-read the decision, not to describe the rule that changed
+ * underneath it.
  */
 async function startExercise(button, goal) {
     button.disabled = true;
@@ -243,8 +222,7 @@ async function startExercise(button, goal) {
     } catch (err) {
         button.disabled = false;
         toast.error(err);
-        if (err?.code === "invalid_transition" || err?.code === "too_soon"
-            || err?.code === "too_many_exercises") {
+        if (err?.code === "invalid_transition" || err?.code === "too_many_exercises") {
             go("/");
         }
     }

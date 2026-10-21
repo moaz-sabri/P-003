@@ -23,9 +23,9 @@
 //     `domain/goal-action.js` turns that into the single decision about what can be
 //     done. Neither page decides anything for itself.
 //
-// Everything about the SCHEDULE is unchanged: one exercise per interval, counted from
-// when the last one was finished, with a cap on how fast any ONE goal may start new
-// ones. None of that depends on who owns the questions.
+// Everything about the SCHEDULE is unchanged: exercises are bounded only by how fast
+// this ONE goal may start new ones, and nothing else. None of that depends on who owns
+// the questions.
 
 import { validateGoal, assertValid } from "../domain/validation.js";
 import { planSchedule, SCHEDULE } from "../domain/schedule.js";
@@ -42,7 +42,8 @@ import {
     // the data layer to change a goal. The separation is the point of the service
     // layer: `createGoal` below validates, and the repository neither knows nor cares
     // what a valid goal is.
-    createGoal as createGoalRecord, updateGoalPlan, completeGoal, addGoalRefs
+    createGoal as createGoalRecord, updateGoalPlan, completeGoal, addGoalRefs,
+    deleteGoal as deleteGoalRecord
 } from "../data/repo-goals.js";
 import { listQuestions } from "../data/repo-questions.js";
 import {
@@ -381,6 +382,24 @@ export async function unarchive(id) {
 }
 
 /**
+ * Remove a goal entirely — the goal, its references, and its whole history.
+ *
+ * THE OTHER END OF `archive`. Archiving files a goal away with every report intact
+ * and is reversible; deleting is the path a reader takes when they want the plan
+ * actually gone. What is NOT touched is the material: the questions and the groups
+ * belong to nobody and removing a plan must not destroy the reader's writing (see
+ * `repo-goals.deleteGoal` for that contract). A deleted goal leaves the active
+ * list and frees its slot, exactly as archiving does.
+ *
+ * The confirmation dialog is the page's job — this is the fact of deletion, and it
+ * is deliberately not asked for twice: a page that has already shown a confirm is
+ * not made safer by a service that shows another.
+ */
+export async function deleteGoal(id) {
+    return deleteGoalRecord(id);
+}
+
+/**
  * The goal that takes the place of one just closed: same plan, same material, nothing
  * carried over.
  *
@@ -422,9 +441,7 @@ export async function succeedGoal(previous) {
         title: previous.title,
         description: previous.description ?? "",
         newPerExercise: previous.newPerExercise,
-        reviewDepth: previous.reviewDepth,
-        intervalDays: previous.intervalDays,
-        durationDays: previous.durationDays
+        reviewDepth: previous.reviewDepth
     });
 
     // The material, through the same two writes the picker's checkboxes use -- and

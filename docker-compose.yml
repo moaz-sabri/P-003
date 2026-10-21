@@ -2,8 +2,9 @@ services:
   web:
     build: { context: ., target: web }
     restart: unless-stopped
+    container_name: P-003
     ports:
-      - "${PORT:-8082}:8080"
+      - "${PORT:-8033}:8080"
     depends_on: [php]
     read_only: true
     tmpfs: [/tmp]
@@ -17,7 +18,7 @@ services:
           "-q",
           "-O",
           "/dev/null",
-          "http://127.0.0.1:8082/api/health",
+          "http://127.0.0.1:8033/api/health",
         ]
       interval: 30s
       timeout: 5s

@@ -17,9 +17,7 @@
 // Every code below is an `error.<code>` key in both language tables.
 
 import { ValidationError } from "./errors.js";
-import {
-    DEFAULT_DURATION_DAYS, DEFAULT_INTERVAL_DAYS, DEFAULT_NEW_PER_EXERCISE, DEFAULT_REVIEW_DEPTH
-} from "../config.js";
+import { NEW_PER_EXERCISE, REVIEW_DEPTH } from "../config.js";
 
 /** The boundaries, in one place, because the same numbers appear in the form's
  *  input attributes and in the messages and in the server's copy. */
@@ -33,8 +31,13 @@ export const LIMITS = {
      *  a 320px screen, next to the goal it belongs to. A name longer than this is
      *  not a label any more. */
     GROUP_NAME_MAX: 40,
-    NEW_PER_EXERCISE_MIN: 1,
-    NEW_PER_EXERCISE_MAX: 20,
+    /** The number of new questions every exercise introduces, and how many of the
+     *  last-drawn exercises every exercise reviews. These are the whole plan: the
+     *  numbers are fixed, so the limits below are the two numbers themselves (an
+     *  exercise of ten new questions and a review of the last three), and there are
+     *  no min/max pairs to negotiate. */
+    NEW_PER_EXERCISE: NEW_PER_EXERCISE,
+    REVIEW_DEPTH: REVIEW_DEPTH,
     /** The most items an exercise the reader NAMED may carry. It exists because a
      *  selection has no natural ceiling: `newPerExercise` bounds the plan, and the
      *  plan is what a selection replaces. "Everything in this goal" is four hundred
@@ -42,12 +45,6 @@ export const LIMITS = {
      *  session stops being something anybody finishes, and the picker warns before
      *  the reader crosses it rather than the builder refusing afterwards. */
     EXERCISE_ITEMS_MAX: 120,
-    REVIEW_DEPTH_MIN: 1,
-    REVIEW_DEPTH_MAX: 6,
-    INTERVAL_DAYS_MIN: 1,
-    INTERVAL_DAYS_MAX: 365,
-    DURATION_DAYS_MIN: 1,
-    DURATION_DAYS_MAX: 3650,
     /** A search box is not a feature here, but a list of 2000 questions is a real
      *  thing a person can end up with, so pagination is by slice, not by "assume
      *  it fits". */
@@ -59,6 +56,23 @@ export const LIMITS = {
  *  the same question can be answered with radio buttons on one screen and with
  *  tap targets on another, and the answer must not change when it does. */
 export const QUESTION_KINDS = ["single", "multiple"];
+
+/** The fixed set of group categories, in the order the list is drawn.
+ *
+ *  A category is a label the reader picks at creation time — the three shelves a
+ *  whole shelf can be filed under — and it is stored as the category's id because
+ *  the app is bilingual: the translation lives in `strings.js`, keyed by
+ *  `labelKey`, and the data never has to change when the language does.
+ *
+ *  Unknown ids fold into the "no category" section of the list rather than being
+ *  invented: that is the same handling a group without a category gets, because
+ *  for the reader they are the same thing — a shelf the list has no heading for.
+ */
+export const GROUP_CATEGORIES = [
+    { id: "education", labelKey: "groups.category_education" },
+    { id: "sport", labelKey: "groups.category_sport" },
+    { id: "cooking", labelKey: "groups.category_cooking" }
+];
 
 /** Trim, and collapse runs of internal whitespace. Applied to every text field
  *  before it is stored and not just to the one the reader happened to leave a
@@ -121,22 +135,15 @@ function claim(errors, field, code) {
     if (!(field in errors)) errors[field] = code;
 }
 
-function intInRange(value, min, max, fallback) {    if (value === null || value === undefined) return fallback;
-    if (typeof value === "string" && value.trim() === "") return fallback;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.min(max, Math.max(min, Math.round(n)));
-}
-
 /* --------------------------------- goal ---------------------------------- */
 
 /**
  * Check a goal draft.
  *
  * @returns {{ok: boolean, errors: Record<string,string>, values: object}}
- *   `values` is present and usable even when `ok` is false: the numbers are
- *   clamped into range rather than rejected, so a half-typed goal can still be
- *   shown back with its numbers corrected and only its missing title underlined.
+ *   `values` is present and usable even when `ok` is false: the title is clamped
+ *   and the plan is fixed, so a saved goal always carries a plan a reader never
+ *   had to choose.
  */
 export function validateGoal(draft = {}) {
     const errors = {};
@@ -148,31 +155,18 @@ export function validateGoal(draft = {}) {
     const description = cleanText(draft.description);
     if (description.length > LIMITS.TEXT_MAX) errors.description = "too_long";
 
-    // Out-of-range numbers are corrected instead of refused. A number field on a
-    // phone keyboard produces these by accident — the spinner overshoots, the
-    // paste brings a whole paragraph — and refusing the save over an interval
-    // that is one day too long teaches people that the field is hostile.
-    const newPerExercise = intInRange(
-        draft.newPerExercise, LIMITS.NEW_PER_EXERCISE_MIN, LIMITS.NEW_PER_EXERCISE_MAX,
-        DEFAULT_NEW_PER_EXERCISE
-    );
-    const reviewDepth = intInRange(
-        draft.reviewDepth, LIMITS.REVIEW_DEPTH_MIN, LIMITS.REVIEW_DEPTH_MAX,
-        DEFAULT_REVIEW_DEPTH
-    );
-    const intervalDays = intInRange(
-        draft.intervalDays, LIMITS.INTERVAL_DAYS_MIN, LIMITS.INTERVAL_DAYS_MAX,
-        DEFAULT_INTERVAL_DAYS
-    );
-    const durationDays = intInRange(
-        draft.durationDays, LIMITS.DURATION_DAYS_MIN, LIMITS.DURATION_DAYS_MAX,
-        DEFAULT_DURATION_DAYS
-    );
+    // The plan is fixed, so the two numbers are not read from the draft at all:
+    // a stored goal that carries an old per-exercise or review-depth value keeps
+    // it (the builder clamps), but a goal saved from now on has exactly ten new
+    // questions and a review of the last three, and any `intervalDays` or
+    // `durationDays` a draft still holds is dropped rather than stored.
+    const newPerExercise = NEW_PER_EXERCISE;
+    const reviewDepth = REVIEW_DEPTH;
 
     return {
         ok: Object.keys(errors).length === 0,
         errors,
-        values: { title, description, newPerExercise, reviewDepth, intervalDays, durationDays }
+        values: { title, description, newPerExercise, reviewDepth }
     };
 }
 
@@ -286,7 +280,7 @@ export function validateQuestion(draft = {}) {
  * exactly this reason, and the second one it would otherwise reject could have been a
  * different goal's group all along.
  *
- * @param {{name: string}} draft
+ * @param {{name: string, category?: string|null}} draft
  * @param {string[]} existingNames  the names this group may not take
  */
 export function validateGroup(draft = {}, existingNames = []) {
@@ -303,7 +297,13 @@ export function validateGroup(draft = {}, existingNames = []) {
         }
     }
 
-    return { ok: Object.keys(errors).length === 0, errors, values: { name } };
+    // A category is only ever one of the fixed ids, or nothing at all. The list
+    // itself is the whole vocabulary — a hand-written request that invents an id
+    // gets a group the list would file under "no category", which is where a
+    // reader who did not pick one belongs anyway.
+    const category = GROUP_CATEGORIES.some((c) => c.id === draft.category) ? draft.category : null;
+
+    return { ok: Object.keys(errors).length === 0, errors, values: { name, category } };
 }
 
 /* --------------------------------- assert -------------------------------- */

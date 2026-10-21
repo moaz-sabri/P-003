@@ -276,7 +276,7 @@ test("a backup survives the whole trip out and back", async () => {
     const original = {
         [STORE.GOALS]: [{
             id: uid("g", 1), title: "German", description: "", status: "active",
-            newPerExercise: 5, reviewDepth: 3, intervalDays: 1,
+            newPerExercise: 5, reviewDepth: 3,
             createdAt: 100, completedAt: null, deletedAt: null,
             updatedAt: 100, rev: 7, device: "dev_a", dirty: 0
         }],

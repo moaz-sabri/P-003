@@ -11,9 +11,9 @@
 //     its CATEGORIES -- the shelves it is pointed at, by name and size
 //
 // NOT ON IT
-//     the plan's four numbers. They are editable, they are not what a reader is
-//     checking when they open the app, and they were here because the home page was
-//     once the goal page. They are on the goal's page.
+//     the plan's numbers. The plan is the same fixed ten-new / review-last-three
+//     for every goal now, so there is nothing per-goal to check anyway; the page
+//     would be four numbers that never move.
 //     the "choose what to be asked" button. That is a decision, and the home page is
 //     a place to find out what is due rather than a place to make one.
 //
@@ -36,7 +36,7 @@
 
 import { h, link, meter, statRow, stat, emptyState } from "../dom.js";
 import { head, card } from "../page.js";
-import { t, formatPercent, formatCountdown } from "../../i18n/i18n.js";
+import { t, formatPercent } from "../../i18n/i18n.js";
 import { overviews, goalAction } from "../../services/goal-service.js";
 import { goalActions, contentHref } from "../parts/goal-actions.js";
 import { setCurrentGoal } from "../nav.js";
@@ -79,10 +79,11 @@ export async function render() {
  * is.
  *
  * THE STATE LINE IS BUILT FROM ONE DECISION, which is `goalAction` over `plan` and
- * `quota`, and it is asked once per card. The schedule answers whether this goal's own
- * interval has elapsed and the quota answers whether this goal has been started too
- * often in the last two days; they are different questions with different sentences,
- * and a card that answered only the first would offer a Start the service refuses.
+ * `quota`, and it is asked once per card. The schedule answers whether this goal is
+ * open (active, not closed or archived) and the quota answers whether it has been
+ * started too often in the last two days; they are different questions with different
+ * sentences, and a card that answered only the first would offer a Start the service
+ * refuses.
  *
  * `compact` is set on the action block: the home page offers a Start and a resume,
  * and the "choose what to be asked" button belongs on the goal's own page, which is
@@ -129,20 +130,13 @@ async function goalCard(row) {
     // Progress. Read through the same `summarize` the reports page makes, so the two
     // can never disagree about how much is learned.
     const p = stats.progress;
-    const endsAt = plan?.endsAt;
 
     body.appendChild(h("div", { style: { "margin-top": "var(--space-3)" } },
         meter(p.percent),
         h("div.row-between", { style: { "margin-top": "var(--space-2)" } },
             h("span.small.muted", { text: `${p.learned} / ${material.count}` }),
             h("span.small.nums", { text: formatPercent(p.percent) })
-        ),
-        endsAt
-            ? h("p.small.muted", {
-                style: { "margin-top": "var(--space-2)" },
-                text: t("home.ends_in", { time: formatCountdown(endsAt - Date.now()) })
-            })
-            : null
+        )
     ));
 
     body.appendChild(h("div", { style: { "margin-top": "var(--space-3)" } },
